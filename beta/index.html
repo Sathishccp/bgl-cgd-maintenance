@@ -154,6 +154,10 @@
             </button>
           </div>
 
+          <button id="changeOwnPasswordButton" onclick="openOwnPasswordModal()" class="hidden px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 flex items-center gap-1" title="Change your password">
+            <i class="fa-solid fa-key"></i><span class="hidden sm:inline">Password</span>
+          </button>
+
           <button onclick="openProgressModal()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 flex items-center gap-1">
             <i class="fa-solid fa-chart-line"></i> <span class="hidden sm:inline">Progress</span>
           </button>
@@ -429,10 +433,14 @@
 
       <form id="addMemberForm" onsubmit="saveNewTeamMember(event)" class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2.5 mb-4">
         <h4 class="font-bold text-teal-300 flex items-center gap-1"><i class="fa-solid fa-user-plus"></i> Add New Staff Login</h4>
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
           <input type="text" id="newUserId" required placeholder="User ID (e.g. GGS/HYD/039)" class="p-2 bg-slate-950 border border-slate-700 rounded text-white uppercase font-mono">
           <input type="text" id="newUserName" required placeholder="Full Name" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
-          <input type="text" id="newUserPass" required placeholder="Password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+          <input type="text" id="newUserPass" required placeholder="Temporary password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+          <select id="newUserRoleSelect" required onchange="updateNewUserRoleFields()" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+            <option value="tech">Technician</option>
+            <option value="admin">Admin</option>
+          </select>
           <select id="newUserTeamSelect" required class="p-2 bg-slate-950 border border-slate-700 rounded text-white"></select>
         </div>
         <div class="flex justify-end">
@@ -451,6 +459,7 @@
               <th class="p-2.5">User ID</th>
               <th class="p-2.5">Name</th>
               <th class="p-2.5">Password</th>
+              <th class="p-2.5">Role</th>
               <th class="p-2.5">Team</th>
               <th class="p-2.5 text-right">Action</th>
             </tr>
@@ -489,6 +498,35 @@
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
           <button type="button" onclick="closeModal('editUserModal')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded">Cancel</button>
           <button type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Technician Self-Service Password Modal (beta-local only) -->
+  <div id="ownPasswordModal" class="hidden fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-3">
+    <div class="glass-card w-full max-w-sm p-5 rounded-2xl border border-slate-700 text-xs">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white"><i class="fa-solid fa-key text-amber-400 mr-1"></i> Change My Password</h3>
+          <p class="text-slate-400 mt-1">For this beta browser only</p>
+        </div>
+        <button type="button" onclick="closeModal('ownPasswordModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="ownPasswordForm" onsubmit="saveOwnPassword(event)" class="space-y-3">
+        <label class="block text-slate-400">Current password
+          <input id="ownPasswordCurrent" type="password" autocomplete="current-password" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
+        </label>
+        <label class="block text-slate-400">New password (at least 6 characters)
+          <input id="ownPasswordNew" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
+        </label>
+        <label class="block text-slate-400">Confirm new password
+          <input id="ownPasswordConfirm" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
+        </label>
+        <p id="ownPasswordError" class="hidden text-rose-300"></p>
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('ownPasswordModal')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Password</button>
         </div>
       </form>
     </div>
@@ -1198,7 +1236,7 @@
       try {
         let customPasses={}; try { customPasses=JSON.parse(localStorage.getItem('bgl_custom_passwords')||'{}'); } catch (_) {}
         let user=ROSTER_MAP[u];
-        const matches = candidate => candidate && sanitizeKey(candidate.id)===u && (p===String(candidate.pass||candidate.password||'').trim() || p.toUpperCase()===String(candidate.pass||candidate.password||'').trim().toUpperCase());
+        const matches = candidate => { const saved=customPasses[candidate?.id]; const actual=saved||candidate?.pass||candidate?.password||''; return !!candidate && sanitizeKey(candidate.id)===u && (p===String(actual).trim() || p.toUpperCase()===String(actual).trim().toUpperCase()); };
         if (user) {
           const expected=customPasses[user.id]||user.pass;
           if (!(p===expected || p.toUpperCase()===String(expected).toUpperCase() || p==='1234' || p.toUpperCase()===u)) user=null;
@@ -1271,6 +1309,8 @@
         document.getElementById('userZoneLabel').textContent = `${currentUser.name} (${currentUser.team})`;
         const selectionHeader = document.getElementById('assetSelectionHeader');
         if (selectionHeader) selectionHeader.classList.toggle('hidden', currentUser.role !== 'admin');
+        const selfPasswordButton = document.getElementById('changeOwnPasswordButton');
+        if (selfPasswordButton) selfPasswordButton.classList.toggle('hidden', currentUser.role === 'admin');
         const headerNotifications = document.getElementById('enableHeaderNotifications');
         if (headerNotifications) {
           headerNotifications.classList.toggle('hidden', currentUser.role === 'admin');
@@ -1315,15 +1355,19 @@
         if (storedCP) customPasses = JSON.parse(storedCP);
       } catch(e) {}
 
-      Object.values(ROSTER_MAP).forEach(u => {
-        const currentPass = customPasses[u.id] || u.pass;
+      const staff = new Map(Object.values(ROSTER_MAP).map(u => [sanitizeKey(u.id), u]));
+      cloudTechnicians.forEach(u => { if (!staff.has(sanitizeKey(u.id))) staff.set(sanitizeKey(u.id), u); });
+      staff.forEach(u => {
+        const currentPass = customPasses[u.id] || u.pass || u.password || '';
+        const roleLabel = String(u.role || 'tech').toLowerCase() === 'admin' ? 'Admin' : 'Technician';
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-800/40 transition';
         tr.innerHTML = `
           <td class="p-2.5 font-mono text-white font-bold">${u.id}</td>
           <td class="p-2.5 text-slate-300">${u.name}</td>
           <td class="p-2.5 font-mono text-teal-300 font-bold tracking-wider">${currentPass}</td>
-          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${u.team}</span></td>
+          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] ${roleLabel === 'Admin' ? 'text-rose-300' : 'text-teal-300'}">${roleLabel}</span></td>
+          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${u.team || '—'}</span></td>
           <td class="p-2.5 text-right whitespace-nowrap">
             <button onclick="openEditUserModal('${u.id}')" title="Edit Password" class="p-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700">
               <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Password
@@ -1379,16 +1423,59 @@
       const id=document.getElementById('newUserId').value.trim().toUpperCase();
       const name=document.getElementById('newUserName').value.trim();
       const pass=document.getElementById('newUserPass').value.trim();
-      const team=document.getElementById('newUserTeamSelect').value;
-      if(!id||!name||!pass||!team)return showToast('Complete all staff account fields.');
+      const role=document.getElementById('newUserRoleSelect').value;
+      const team=role==='admin'?'ALL':document.getElementById('newUserTeamSelect').value;
+      if(!id||!name||!pass||!role||!team)return showToast('Complete all staff account fields.');
       try {
-        await postCloudAction({action:'addUser',id,name,pass,team,role:'tech'});
-        ROSTER_MAP[id]={id,name,pass,team,role:'tech'};
+        await postCloudAction({action:'addUser',id,name,pass,team,role});
+        ROSTER_MAP[id]={id,name,pass,team,role};
         cloudTechnicians=cloudTechnicians.filter(u=>sanitizeKey(u.id)!==sanitizeKey(id));
-        cloudTechnicians.push({id,name,pass,team,role:'tech'});
+        if(role!=='admin') cloudTechnicians.push({id,name,pass,team,role});
         renderTeamsUI();renderTeamMembers();document.getElementById('addMemberForm').reset();
         showToast(`Beta account ${id} added in this browser only.`);
       } catch(err) { showToast(`Could not save beta account: ${err.message}`); }
+    }
+
+    function updateNewUserRoleFields() {
+      const role = document.getElementById('newUserRoleSelect')?.value || 'tech';
+      const teamSelect = document.getElementById('newUserTeamSelect');
+      if (!teamSelect) return;
+      const allOption = [...teamSelect.options].find(option => option.value === 'ALL');
+      if (role === 'admin') {
+        if (!allOption) teamSelect.insertAdjacentHTML('beforeend', '<option value="ALL">ALL (Admin)</option>');
+        teamSelect.value = 'ALL';
+      } else if (teamSelect.value === 'ALL') {
+        const firstTeam = [...teamSelect.options].find(option => option.value && option.value !== 'ALL');
+        teamSelect.value = firstTeam?.value || '';
+      }
+    }
+
+    function openOwnPasswordModal() {
+      if (!currentUser || currentUser.role === 'admin') return;
+      document.getElementById('ownPasswordForm').reset();
+      document.getElementById('ownPasswordError').classList.add('hidden');
+      openModal('ownPasswordModal');
+    }
+
+    function saveOwnPassword(event) {
+      event.preventDefault();
+      const error = document.getElementById('ownPasswordError');
+      const current = document.getElementById('ownPasswordCurrent').value;
+      const next = document.getElementById('ownPasswordNew').value;
+      const confirmNext = document.getElementById('ownPasswordConfirm').value;
+      let customPasses = {};
+      try { customPasses = JSON.parse(localStorage.getItem('bgl_custom_passwords') || '{}'); } catch (_) {}
+      const fail = message => { error.textContent = message; error.classList.remove('hidden'); };
+      if (!currentUser || currentUser.role === 'admin') return;
+      const expected = customPasses[currentUser.id] || currentUser.pass || '';
+      if (current !== expected) return fail('Current password is incorrect.');
+      if (next.trim().length < 6) return fail('Use at least 6 characters for the new password.');
+      if (next !== confirmNext) return fail('The new passwords do not match.');
+      customPasses[currentUser.id] = next;
+      localStorage.setItem('bgl_custom_passwords', JSON.stringify(customPasses));
+      currentUser.pass = next;
+      closeModal('ownPasswordModal');
+      showToast('Password changed for this beta browser.');
     }
 
     function resetDefaultStaffRoster() {
@@ -2596,7 +2683,10 @@
       const assetTeamSelect = document.getElementById('newAssetTeamSelect');
       const singleTeamSelect = document.getElementById('singleAssignTeamSelect');
       const teamOptions = teams.map(team => `<option value="${team}">${team}</option>`).join('');
-      if (userTeamSelect) userTeamSelect.innerHTML = teamOptions;
+      if (userTeamSelect) {
+        userTeamSelect.innerHTML = `${teamOptions}<option value="ALL">ALL (Admin)</option>`;
+        updateNewUserRoleFields();
+      }
       if (assetTeamSelect) assetTeamSelect.innerHTML = teamOptions;
       if (singleTeamSelect) singleTeamSelect.innerHTML = teamOptions;
       populateBatchTechnicianSelect();
@@ -2628,7 +2718,7 @@
             cloudTechnicians = json.users.map(user => ({
               id: user.id, name: user.name, pass: user.pass || user.password || "", team: user.team || "",
               role: String(user.role || "tech").toLowerCase()
-            })).filter(user => user.name && ["tech", "technician"].includes(user.role));
+            })).filter(user => user.name && ["tech", "technician", "admin"].includes(user.role));
             if (currentUser && currentUser.role === "admin") renderTeamsUI();
           }
           if (json.assets && json.assets.length) {
