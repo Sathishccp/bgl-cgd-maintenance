@@ -1938,11 +1938,11 @@
           let marker;
           if (customIcons[asset.type]) {
             const iconHtml = `
-              <div style="position:relative; width:32px; height:32px; border-radius:50%; border:2px solid ${info.color}; background:#0f172a; display:flex; align-items:center; justify-content:center; box-shadow:0 0 8px ${info.color}88;">
-                <img src="${customIcons[asset.type]}" style="width:20px; height:20px; object-fit:contain;" />
+              <div style="position:relative; width:42px; height:42px; box-sizing:border-box; border-radius:50%; border:2px solid ${info.color}; background:rgba(255,255,255,.94); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 7px rgba(15,23,42,.38);">
+                <img src="${customIcons[asset.type]}" alt="${asset.type} asset" style="display:block; width:32px; height:32px; object-fit:contain; filter:drop-shadow(0 1px 1px rgba(15,23,42,.35));" />
               </div>
             `;
-            const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [32, 32], iconAnchor: [16, 16] });
+            const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [42, 42], iconAnchor: [21, 21] });
             marker = L.marker([asset.lat, asset.lng], { icon: customIcon });
           } else {
             marker = L.circleMarker([asset.lat, asset.lng], {
