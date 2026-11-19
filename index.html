@@ -79,7 +79,7 @@
           <label class="block text-xs font-semibold text-slate-300 mb-1">Password</label>
           <div class="relative">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500"><i class="fa-solid fa-lock text-xs"></i></span>
-            <input type="password" id="loginPassword" onkeyup="if(event.key==='Enter') executeLogin()" placeholder="Enter Password (or PIN 1234)" class="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-teal-500">
+            <input type="password" id="loginPassword" onkeyup="if(event.key==='Enter') executeLogin()" placeholder="Enter Password" class="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-teal-500">
             <button type="button" onclick="togglePassVisibility()" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300">
               <i id="passEyeIcon" class="fa-solid fa-eye text-xs"></i>
             </button>
@@ -424,8 +424,8 @@
     <div class="glass-card w-full max-w-2xl p-5 rounded-2xl max-h-[92vh] overflow-y-auto border border-slate-700 text-xs">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
         <div>
-          <h3 class="text-sm font-bold text-white flex items-center gap-1.5"><i class="fa-solid fa-users-gear text-indigo-400"></i> Staff Accounts & Passwords</h3>
-          <p class="text-slate-400">View and edit passwords or add new technicians</p>
+          <h3 class="text-sm font-bold text-white flex items-center gap-1.5"><i class="fa-solid fa-users-gear text-indigo-400"></i> Staff Accounts</h3>
+          <p class="text-slate-400">Create accounts and manage staff roles. Passwords remain private to each staff member.</p>
         </div>
         <button onclick="closeModal('teamManageModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -435,7 +435,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
           <input type="text" id="newUserId" required placeholder="User ID (e.g. GGS/HYD/039)" class="p-2 bg-slate-950 border border-slate-700 rounded text-white uppercase font-mono">
           <input type="text" id="newUserName" required placeholder="Full Name" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
-          <input type="text" id="newUserPass" required placeholder="Temporary password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+          <input type="password" id="newUserPass" autocomplete="new-password" required placeholder="Temporary password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
           <select id="newUserRoleSelect" required onchange="updateNewUserRoleFields()" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
             <option value="tech">Technician</option>
             <option value="admin">Admin</option>
@@ -449,7 +449,7 @@
 
       <div class="flex items-center justify-between mb-1.5">
         <h4 class="font-bold text-slate-300">Active Staff Registry</h4>
-        <button onclick="resetDefaultStaffRoster()" class="text-[11px] text-rose-400 hover:underline">Reset to Default Roster</button>
+
       </div>
       <div class="overflow-x-auto border border-slate-800 rounded-lg">
         <table class="w-full text-left">
@@ -457,48 +457,13 @@
             <tr>
               <th class="p-2.5">User ID</th>
               <th class="p-2.5">Name</th>
-              <th class="p-2.5">Password</th>
               <th class="p-2.5">Role</th>
               <th class="p-2.5">Team</th>
-              <th class="p-2.5 text-right">Action</th>
             </tr>
           </thead>
           <tbody id="teamMembersTableBody" class="divide-y divide-slate-800 text-slate-300"></tbody>
         </table>
       </div>
-    </div>
-  </div>
-
-  <!-- Edit Password Modal -->
-  <div id="editUserModal" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3">
-    <div class="glass-card w-full max-w-sm p-5 rounded-2xl border border-slate-700 text-xs">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-1.5"><i class="fa-solid fa-key text-amber-400"></i> Edit Password & Account</h3>
-        <button onclick="closeModal('editUserModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <form id="editUserForm" onsubmit="saveUserChanges(event)" class="space-y-3">
-        <input type="hidden" id="editUserOldId">
-        <div>
-          <label class="block text-slate-400 mb-1">User ID</label>
-          <input type="text" id="editUserId" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white font-mono uppercase">
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Full Name</label>
-          <input type="text" id="editUserName" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Password</label>
-          <input type="text" id="editUserPass" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white font-mono">
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Assigned Team</label>
-          <select id="editUserTeamSelect" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></select>
-        </div>
-        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-          <button type="button" onclick="closeModal('editUserModal')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Changes</button>
-        </div>
-      </form>
     </div>
   </div>
 
@@ -966,25 +931,25 @@
 
     // --- 100% HARDCODED DIRECT ROSTER MAP ---
     const ROSTER_MAP = {
-      "ADMIN": { id: 'admin', pass: 'Admin123', name: 'Satish M (Admin)', role: 'admin', team: 'ALL' },
-      "GGS/HYD/015": { id: 'GGS/HYD/015', pass: 'GGS/HYD/015', name: 'Matte Devendar', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/022": { id: 'GGS/HYD/022', pass: 'GGS/HYD/022', name: 'Muthineni Satish', role: 'tech', team: 'HMT' },
-      "GGS/HYD/010": { id: 'GGS/HYD/010', pass: 'GGS/HYD/010', name: 'Mekala Mahesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/017": { id: 'GGS/HYD/017', pass: 'GGS/HYD/017', name: 'Arra Chiranjeevi', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/024": { id: 'GGS/HYD/024', pass: 'GGS/HYD/024', name: 'Deshamaina Praveen Kumar', role: 'tech', team: 'HMT' },
-      "GGS/HYD/025": { id: 'GGS/HYD/025', pass: 'GGS/HYD/025', name: 'Dontharaboina Mahesh Kumar', role: 'tech', team: 'HMT' },
-      "GGS/HYD/019": { id: 'GGS/HYD/019', pass: 'GGS/HYD/019', name: 'Dontharaboina Nagaraju', role: 'tech', team: 'HMT' },
-      "GGS/HYD/016": { id: 'GGS/HYD/016', pass: 'GGS/HYD/016', name: 'Jupalli Naresh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/035": { id: 'GGS/HYD/035', pass: 'GGS/HYD/035', name: 'Md Dilshan Alam', role: 'tech', team: 'HMT' },
-      "GGS/HYD/003": { id: 'GGS/HYD/003', pass: 'GGS/HYD/003', name: 'Moluguri Dinesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/020": { id: 'GGS/HYD/020', pass: 'GGS/HYD/020', name: 'Nimmala Madhu', role: 'tech', team: 'HMT' },
-      "GGS/HYD/008": { id: 'GGS/HYD/008', pass: 'GGS/HYD/008', name: 'K.Rajesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/009": { id: 'GGS/HYD/009', pass: 'GGS/HYD/009', name: 'Rathod Ramesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/036": { id: 'GGS/HYD/036', pass: 'GGS/HYD/036', name: 'Salendra yadagiri', role: 'tech', team: 'HMT' },
-      "GGS/HYD/018": { id: 'GGS/HYD/018', pass: 'GGS/HYD/018', name: 'Vagamari Sai', role: 'tech', team: 'HMT' },
-      "GGS/HYD/037": { id: 'GGS/HYD/037', pass: 'GGS/HYD/037', name: 'Yavapuram Anilkumar', role: 'tech', team: 'HMT' },
-      "GGS/HYD/038": { id: 'GGS/HYD/038', pass: 'GGS/HYD/038', name: 'Md Sadab', role: 'tech', team: 'HMT' },
-      "GGS/HYD/023": { id: 'GGS/HYD/023', pass: 'GGS/HYD/023', name: 'Naralakanti Vijay', role: 'tech', team: 'KPHB' }
+      "ADMIN": { id: 'admin', name: 'Satish M (Admin)', role: 'admin', team: 'ALL' },
+      "GGS/HYD/015": { id: 'GGS/HYD/015', name: 'Matte Devendar', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/022": { id: 'GGS/HYD/022', name: 'Muthineni Satish', role: 'tech', team: 'HMT' },
+      "GGS/HYD/010": { id: 'GGS/HYD/010', name: 'Mekala Mahesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/017": { id: 'GGS/HYD/017', name: 'Arra Chiranjeevi', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/024": { id: 'GGS/HYD/024', name: 'Deshamaina Praveen Kumar', role: 'tech', team: 'HMT' },
+      "GGS/HYD/025": { id: 'GGS/HYD/025', name: 'Dontharaboina Mahesh Kumar', role: 'tech', team: 'HMT' },
+      "GGS/HYD/019": { id: 'GGS/HYD/019', name: 'Dontharaboina Nagaraju', role: 'tech', team: 'HMT' },
+      "GGS/HYD/016": { id: 'GGS/HYD/016', name: 'Jupalli Naresh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/035": { id: 'GGS/HYD/035', name: 'Md Dilshan Alam', role: 'tech', team: 'HMT' },
+      "GGS/HYD/003": { id: 'GGS/HYD/003', name: 'Moluguri Dinesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/020": { id: 'GGS/HYD/020', name: 'Nimmala Madhu', role: 'tech', team: 'HMT' },
+      "GGS/HYD/008": { id: 'GGS/HYD/008', name: 'K.Rajesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/009": { id: 'GGS/HYD/009', name: 'Rathod Ramesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/036": { id: 'GGS/HYD/036', name: 'Salendra yadagiri', role: 'tech', team: 'HMT' },
+      "GGS/HYD/018": { id: 'GGS/HYD/018', name: 'Vagamari Sai', role: 'tech', team: 'HMT' },
+      "GGS/HYD/037": { id: 'GGS/HYD/037', name: 'Yavapuram Anilkumar', role: 'tech', team: 'HMT' },
+      "GGS/HYD/038": { id: 'GGS/HYD/038', name: 'Md Sadab', role: 'tech', team: 'HMT' },
+      "GGS/HYD/023": { id: 'GGS/HYD/023', name: 'Naralakanti Vijay', role: 'tech', team: 'KPHB' }
     };
 
     const INITIAL_ASSETS = [
@@ -1041,6 +1006,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      safeStore.remove('bgl_custom_passwords');
       loadStoredAppData();
       checkSession();
       if (currentUser) restoreMaintenanceDraftOnStartup();
@@ -1104,43 +1070,27 @@
 
     // --- INSTANT BULLETPROOF AUTHENTICATION ---
     async function executeLogin() {
-      const uRaw = document.getElementById('loginUsername').value || '';
-      const pRaw = document.getElementById('loginPassword').value || '';
-      const err = document.getElementById('loginError');
-      const u = sanitizeKey(uRaw), p = pRaw.trim();
-      if (!u || !p) { err.textContent = 'Please enter both User ID and Password'; err.classList.remove('hidden'); return; }
+      const id = (document.getElementById('loginUsername').value || '').trim().toUpperCase();
+      const password = document.getElementById('loginPassword').value || '';
+      const error = document.getElementById('loginError');
+      if (!id || !password) { error.textContent = 'Please enter both User ID and Password'; error.classList.remove('hidden'); return; }
       const button = document.querySelector('#loginSection button[onclick="executeLogin()"]');
       if (button) { button.disabled = true; button.dataset.originalText = button.innerHTML; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking sign-in…'; }
       try {
-        let customPasses = {};
-        try { customPasses = JSON.parse(safeStore.get('bgl_custom_passwords') || '{}'); } catch (_) {}
-        let cloudAccount = null;
-        try {
-          const response = await fetch(`${CLOUD_API_URL}?action=getData`);
-          const data = await response.json();
-          if (data.status === 'success' && Array.isArray(data.users)) {
-            cloudAccount = data.users.find(record => sanitizeKey(record.id) === u) || null;
-            cloudTechnicians = data.users.map(record => ({ id:record.id, name:record.name, pass:record.pass||record.password||'', team:record.team||'', role:String(record.role||'tech').toLowerCase() }));
-          }
-        } catch (_) { /* Allow configured local roster login if the cloud is temporarily unavailable. */ }
-
-        let user = null;
-        if (cloudAccount) {
-          const expected = cloudAccount.pass || cloudAccount.password || '';
-          if (p === String(expected).trim()) {
-            user = { id:cloudAccount.id, name:cloudAccount.name, team:cloudAccount.team||'', role:String(cloudAccount.role||'tech').toLowerCase(), pass:expected };
-          }
-        } else {
-          const rosterUser = ROSTER_MAP[u];
-          if (rosterUser) {
-            const expected = customPasses[rosterUser.id] || rosterUser.pass;
-            if (p === expected || p.toUpperCase() === String(expected).toUpperCase() || p === '1234' || p.toUpperCase() === u) user = { ...rosterUser, pass:expected };
-          }
+        const response = await fetch(CLOUD_API_URL, {
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'authenticate', id, password })
+        });
+        const result = await response.json();
+        if (!response.ok || result.status !== 'success' || !result.user) {
+          error.textContent = result.message || 'Invalid User ID or Password.';
+          error.classList.remove('hidden');
+          return;
         }
-        if (!user) { err.textContent = 'Invalid User ID or Password.'; err.classList.remove('hidden'); return; }
-        currentUser = user;
-        try { localStorage.setItem('bgl_auth_user', JSON.stringify({ id:currentUser.id, name:currentUser.name, role:currentUser.role, team:currentUser.team })); sessionStorage.removeItem('bgl_auth_user'); } catch (_) {}
-        err.classList.add('hidden');
+        currentUser = { ...result.user, role: String(result.user.role || 'tech').toLowerCase() };
+        localStorage.setItem('bgl_auth_user', JSON.stringify({ id:currentUser.id, name:currentUser.name, role:currentUser.role, team:currentUser.team }));
+        sessionStorage.removeItem('bgl_auth_user');
+        error.classList.add('hidden');
         document.getElementById('loginSection').style.setProperty('display', 'none', 'important');
         const appCon = document.getElementById('appContainer');
         appCon.style.setProperty('display', 'flex', 'important');
@@ -1148,9 +1098,9 @@
         initAppView();
         restoreMaintenanceDraftOnStartup();
         showToast(`Welcome, ${currentUser.name}!`);
-      } catch (loginErr) {
-        err.textContent = 'Could not check sign-in. Check your connection and try again.';
-        err.classList.remove('hidden');
+      } catch (err) {
+        error.textContent = 'Could not check sign-in. Ask the administrator to update the Apps Script, then try again.';
+        error.classList.remove('hidden');
       } finally {
         if (button) { button.disabled = false; button.innerHTML = button.dataset.originalText || 'Sign In'; }
       }
@@ -1243,74 +1193,20 @@
       const tbody = document.getElementById('teamMembersTableBody');
       if (!tbody) return;
       tbody.innerHTML = '';
-
-      let customPasses = {};
-      try {
-        const storedCP = safeStore.get('bgl_custom_passwords');
-        if (storedCP) customPasses = JSON.parse(storedCP);
-      } catch(e) {}
-
-      const staff = new Map(Object.values(ROSTER_MAP).map(u => [sanitizeKey(u.id), u]));
-      cloudTechnicians.forEach(u => { if (!staff.has(sanitizeKey(u.id))) staff.set(sanitizeKey(u.id), u); });
-      staff.forEach(u => {
-        const currentPass = customPasses[u.id] || u.pass || u.password || '';
-        const roleLabel = String(u.role || 'tech').toLowerCase() === 'admin' ? 'Admin' : 'Technician';
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-800/40 transition';
-        tr.innerHTML = `
-          <td class="p-2.5 font-mono text-white font-bold">${u.id}</td>
-          <td class="p-2.5 text-slate-300">${u.name}</td>
-          <td class="p-2.5 font-mono text-teal-300 font-bold tracking-wider">${currentPass}</td>
+      const staff = new Map(Object.values(ROSTER_MAP).map(user => [sanitizeKey(user.id), user]));
+      cloudTechnicians.forEach(user => { if (!staff.has(sanitizeKey(user.id))) staff.set(sanitizeKey(user.id), user); });
+      staff.forEach(user => {
+        const roleLabel = String(user.role || 'tech').toLowerCase() === 'admin' ? 'Admin' : 'Technician';
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-800/40 transition';
+        row.innerHTML = `
+          <td class="p-2.5 font-mono text-white font-bold">${user.id}</td>
+          <td class="p-2.5 text-slate-300">${user.name}</td>
           <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] ${roleLabel === 'Admin' ? 'text-rose-300' : 'text-teal-300'}">${roleLabel}</span></td>
-          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${u.team || '—'}</span></td>
-          <td class="p-2.5 text-right whitespace-nowrap">
-            <button onclick="openEditUserModal('${u.id}')" title="Edit Password" class="p-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700">
-              <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Password
-            </button>
-          </td>
+          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${user.team || '—'}</span></td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(row);
       });
-    }
-
-    function openEditUserModal(userId) {
-      const user = Object.values(ROSTER_MAP).find(u => u.id === userId) || cloudTechnicians.find(u => u.id === userId);
-      if (!user) return;
-
-      let customPasses = {};
-      try {
-        const storedCP = safeStore.get('bgl_custom_passwords');
-        if (storedCP) customPasses = JSON.parse(storedCP);
-      } catch(e) {}
-
-      document.getElementById('editUserOldId').value = user.id;
-      document.getElementById('editUserId').value = user.id;
-      document.getElementById('editUserName').value = user.name;
-      document.getElementById('editUserPass').value = customPasses[user.id] || user.pass;
-
-      const teamSelect = document.getElementById('editUserTeamSelect');
-      teamSelect.innerHTML = teams.map(t => `<option value="${t}" ${t === user.team ? 'selected' : ''}>${t}</option>`).join('');
-
-      openModal('editUserModal');
-    }
-
-    function saveUserChanges(e) {
-      e.preventDefault();
-      const targetId = document.getElementById('editUserOldId').value;
-      const newPass = document.getElementById('editUserPass').value.trim();
-
-      let customPasses = {};
-      try {
-        const storedCP = safeStore.get('bgl_custom_passwords');
-        if (storedCP) customPasses = JSON.parse(storedCP);
-      } catch(e) {}
-
-      customPasses[targetId] = newPass;
-      safeStore.set('bgl_custom_passwords', JSON.stringify(customPasses));
-
-      renderTeamMembers();
-      closeModal('editUserModal');
-      showToast(`Password updated for ${targetId}!`);
     }
 
     async function saveNewTeamMember(e) {
@@ -1323,9 +1219,9 @@
       if (!id || !name || !pass || !role || !team) return showToast('Complete all staff account fields.');
       try {
         await postCloudAction({ action: 'addUser', id, name, pass, team, role });
-        ROSTER_MAP[sanitizeKey(id)] = { id, name, pass, team, role };
+        ROSTER_MAP[sanitizeKey(id)] = { id, name, team, role };
         cloudTechnicians = cloudTechnicians.filter(user => sanitizeKey(user.id) !== sanitizeKey(id));
-        if (role !== 'admin') cloudTechnicians.push({ id, name, pass, team, role });
+        if (role !== 'admin') cloudTechnicians.push({ id, name, team, role });
         renderTeamsUI();
         renderTeamMembers();
         document.getElementById('addMemberForm').reset();
@@ -1360,47 +1256,29 @@
       event.preventDefault();
       const error = document.getElementById('ownPasswordError');
       const button = document.getElementById('ownPasswordSaveButton');
-      const current = document.getElementById('ownPasswordCurrent').value;
-      const next = document.getElementById('ownPasswordNew').value.trim();
-      const confirmNext = document.getElementById('ownPasswordConfirm').value.trim();
+      const currentPassword = document.getElementById('ownPasswordCurrent').value;
+      const newPassword = document.getElementById('ownPasswordNew').value;
+      const confirmPassword = document.getElementById('ownPasswordConfirm').value;
       const fail = message => { error.textContent = message; error.classList.remove('hidden'); };
       if (!currentUser || currentUser.role === 'admin') return;
-      if (next.length < 6) return fail('Use at least 6 characters for the new password.');
-      if (next !== confirmNext) return fail('The new passwords do not match.');
+      if (newPassword.trim().length < 6) return fail('Use at least 6 characters for the new password.');
+      if (newPassword !== confirmPassword) return fail('The new passwords do not match.');
       button.disabled = true;
       button.textContent = 'Updating…';
       try {
-        const response = await fetch(`${CLOUD_API_URL}?action=getData`);
-        const data = await response.json();
-        if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Could not verify the current password');
-        const account = (data.users || []).find(user => sanitizeKey(user.id) === sanitizeKey(currentUser.id));
-        if (!account || String(account.pass || account.password || '').trim() !== current.trim()) {
-          return fail('Current password is incorrect.');
-        }
-        await postCloudAction({
-          action: 'addUser', id: account.id, name: account.name, pass: next,
-          team: account.team || currentUser.team || '', role: account.role || currentUser.role || 'tech'
+        const response = await fetch(CLOUD_API_URL, {
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action:'changeOwnPassword', id:currentUser.id, currentPassword, newPassword })
         });
-        currentUser.pass = next;
-        delete customPasses[currentUser.id];
-        safeStore.set('bgl_custom_passwords', JSON.stringify(customPasses));
-        const index = cloudTechnicians.findIndex(user => sanitizeKey(user.id) === sanitizeKey(currentUser.id));
-        if (index >= 0) cloudTechnicians[index] = { ...cloudTechnicians[index], pass: next };
+        const result = await response.json();
+        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Could not update password');
         closeModal('ownPasswordModal');
-        showToast('Password updated. Use your new password the next time you sign in.');
+        showToast('Password updated. Use your new password next time you sign in.');
       } catch (err) {
         fail(err.message || 'Could not update the password. Try again.');
       } finally {
         button.disabled = false;
         button.textContent = 'Save Password';
-      }
-    }
-
-    function resetDefaultStaffRoster() {
-      if (confirm("Reset modified passwords back to default?")) {
-        safeStore.remove('bgl_custom_passwords');
-        renderTeamMembers();
-        showToast("Passwords reset to default!");
       }
     }
 
@@ -2634,7 +2512,7 @@
         if (json.status === "success") {
           if (Array.isArray(json.users)) {
             cloudTechnicians = json.users.map(user => ({
-              id: user.id, name: user.name, pass: user.pass || user.password || "", team: user.team || "",
+              id: user.id, name: user.name, team: user.team || "",
               role: String(user.role || "tech").toLowerCase()
             })).filter(user => user.name && ["tech", "technician", "admin"].includes(user.role));
             if (currentUser && currentUser.role === "admin") { renderTeamsUI(); renderTeamMembers(); }

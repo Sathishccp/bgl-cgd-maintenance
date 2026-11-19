@@ -80,7 +80,7 @@
           <label class="block text-xs font-semibold text-slate-300 mb-1">Password</label>
           <div class="relative">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500"><i class="fa-solid fa-lock text-xs"></i></span>
-            <input type="password" id="loginPassword" onkeyup="if(event.key==='Enter') executeLogin()" placeholder="Enter Password (or PIN 1234)" class="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-teal-500">
+            <input type="password" id="loginPassword" onkeyup="if(event.key==='Enter') executeLogin()" placeholder="Enter Password" class="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-teal-500">
             <button type="button" onclick="togglePassVisibility()" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300">
               <i id="passEyeIcon" class="fa-solid fa-eye text-xs"></i>
             </button>
@@ -425,8 +425,8 @@
     <div class="glass-card w-full max-w-2xl p-5 rounded-2xl max-h-[92vh] overflow-y-auto border border-slate-700 text-xs">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
         <div>
-          <h3 class="text-sm font-bold text-white flex items-center gap-1.5"><i class="fa-solid fa-users-gear text-indigo-400"></i> Staff Accounts & Passwords</h3>
-          <p class="text-slate-400">View and edit passwords or add new technicians</p>
+          <h3 class="text-sm font-bold text-white flex items-center gap-1.5"><i class="fa-solid fa-users-gear text-indigo-400"></i> Staff Accounts</h3>
+          <p class="text-slate-400">Create accounts and manage staff roles. Passwords remain private to each staff member.</p>
         </div>
         <button onclick="closeModal('teamManageModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -436,7 +436,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
           <input type="text" id="newUserId" required placeholder="User ID (e.g. GGS/HYD/039)" class="p-2 bg-slate-950 border border-slate-700 rounded text-white uppercase font-mono">
           <input type="text" id="newUserName" required placeholder="Full Name" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
-          <input type="text" id="newUserPass" required placeholder="Temporary password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+          <input type="password" id="newUserPass" autocomplete="new-password" required placeholder="Temporary password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
           <select id="newUserRoleSelect" required onchange="updateNewUserRoleFields()" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
             <option value="tech">Technician</option>
             <option value="admin">Admin</option>
@@ -450,7 +450,7 @@
 
       <div class="flex items-center justify-between mb-1.5">
         <h4 class="font-bold text-slate-300">Active Staff Registry</h4>
-        <button onclick="resetDefaultStaffRoster()" class="text-[11px] text-rose-400 hover:underline">Reset to Default Roster</button>
+
       </div>
       <div class="overflow-x-auto border border-slate-800 rounded-lg">
         <table class="w-full text-left">
@@ -458,48 +458,13 @@
             <tr>
               <th class="p-2.5">User ID</th>
               <th class="p-2.5">Name</th>
-              <th class="p-2.5">Password</th>
               <th class="p-2.5">Role</th>
               <th class="p-2.5">Team</th>
-              <th class="p-2.5 text-right">Action</th>
             </tr>
           </thead>
           <tbody id="teamMembersTableBody" class="divide-y divide-slate-800 text-slate-300"></tbody>
         </table>
       </div>
-    </div>
-  </div>
-
-  <!-- Edit Password Modal -->
-  <div id="editUserModal" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3">
-    <div class="glass-card w-full max-w-sm p-5 rounded-2xl border border-slate-700 text-xs">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-1.5"><i class="fa-solid fa-key text-amber-400"></i> Edit Password & Account</h3>
-        <button onclick="closeModal('editUserModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <form id="editUserForm" onsubmit="saveUserChanges(event)" class="space-y-3">
-        <input type="hidden" id="editUserOldId">
-        <div>
-          <label class="block text-slate-400 mb-1">User ID</label>
-          <input type="text" id="editUserId" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white font-mono uppercase">
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Full Name</label>
-          <input type="text" id="editUserName" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Password</label>
-          <input type="text" id="editUserPass" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white font-mono">
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Assigned Team</label>
-          <select id="editUserTeamSelect" required class="w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></select>
-        </div>
-        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-          <button type="button" onclick="closeModal('editUserModal')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Changes</button>
-        </div>
-      </form>
     </div>
   </div>
 
@@ -986,7 +951,7 @@
     const LPT_KEY = 'lpt_state';
     const read = key => { try { return JSON.parse(window.__betaStorage.getItem(key) || 'null'); } catch (_) { return null; } };
     const write = (key, value) => window.__betaStorage.setItem(key, JSON.stringify(value));
-    const coreState = () => read(STATE_KEY) || { initialized:false, assets:[], logs:[], notices:[], icons:[], iconsInitialized:true, users:[] };
+    const coreState = () => read(STATE_KEY) || { initialized:false, assets:[], logs:[], notices:[], icons:[], iconsInitialized:true, users:[], passwordOverrides:{}, liveUsers:[], liveUserIds:[] };
     const lptState = () => read(LPT_KEY) || { drafts:[], reports:[], photos:[], nextNo:1 };
     const jsonResponse = obj => new Response(JSON.stringify(obj), {status:200, headers:{'Content-Type':'application/json'}});
     const normalizedUrl = input => { try { return new URL(typeof input === 'string' ? input : input.url); } catch (_) { return null; } };
@@ -994,14 +959,41 @@
     async function handleCore(url, init) {
       const method = String(init?.method || (typeof input !== 'undefined' && input?.method) || 'GET').toUpperCase();
       const state = coreState();
+      state.users = Array.isArray(state.users) ? state.users : [];
+      state.passwordOverrides = state.passwordOverrides || {};
+      state.liveUserIds = state.liveUserIds || [];
       if (method !== 'GET') {
         let body={}; try { body=JSON.parse(init?.body || '{}'); } catch (_) {}
         let result={status:'success', message:'Saved in beta browser only'};
-        if (body.action === 'syncAssets') state.assets = Array.isArray(body.assets) ? body.assets : [];
+        if (body.action === 'authenticate') {
+          const id=String(body.id||'').trim().toUpperCase();
+          const local=state.users.find(u=>String(u.id||'').trim().toUpperCase()===id);
+          const override=state.passwordOverrides?.[id];
+          if(local && String(override||local.pass||'')===String(body.password||'')) return jsonResponse({status:'success',user:{id:local.id,name:local.name,team:local.team||'',role:local.role||'tech'}});
+          if(Object.prototype.hasOwnProperty.call(state.passwordOverrides||{},id)) return jsonResponse({status:'error',message:'Invalid user ID or password'});
+          return nativeFetch(url.href,init);
+        }
+        else if (body.action === 'changeOwnPassword') {
+          const id=String(body.id||'').trim().toUpperCase();
+          const current=String(body.currentPassword||'');
+          const next=String(body.newPassword||'');
+          if(next.trim().length<6) return jsonResponse({status:'error',message:'Use at least 6 characters for the new password'});
+          const local=state.users.find(u=>String(u.id||'').trim().toUpperCase()===id);
+          let verified=false;
+          if(local) verified=String(state.passwordOverrides?.[id]||local.pass||'')===current;
+          else if(!Object.prototype.hasOwnProperty.call(state.passwordOverrides||{},id)) {
+            try { const check=await nativeFetch(url.href,{method:'POST',headers:init.headers,body:JSON.stringify({action:'authenticate',id:body.id,password:current})}); const auth=await check.clone().json(); verified=auth.status==='success'; } catch(_) {}
+          } else verified=String(state.passwordOverrides[id])===current;
+          if(!verified) return jsonResponse({status:'error',message:'Current password is incorrect'});
+          state.passwordOverrides[id]=next;
+          write(STATE_KEY,state);
+          return jsonResponse({status:'success',message:'Password saved in this beta browser only'});
+        }
+        else if (body.action === 'syncAssets') state.assets = Array.isArray(body.assets) ? body.assets : [];
         else if (body.action === 'addUser') {
           const id=String(body.id||'').trim().toUpperCase();
           if (!id || [...state.users].some(u=>String(u.id||'').trim().toUpperCase()===id) || (state.liveUserIds||[]).includes(id)) result={status:'error',message:'A beta account with this ID already exists'};
-          else state.users.push({id,name:body.name||'',pass:body.pass||'',team:body.team||'',role:body.role||'tech'});
+          else { state.users.push({id,name:body.name||'',pass:body.pass||'',team:body.team||'',role:body.role||'tech'}); state.passwordOverrides[id]=body.pass||''; }
         } else if (body.action === 'logMaintenance') {
           const log={id:'BETA-LOG-'+Date.now(),assetId:body.assetId,tech:body.tech,date:body.date,observations:body.observations||'',remarks:body.remarks||'',beforePhotoUrl:body.beforePhoto||'',afterPhotoUrl:body.afterPhoto||'',timestamp:new Date().toISOString()};
           state.logs.push(log); result={status:'success',id:log.id,beforeUrl:log.beforePhotoUrl,afterUrl:log.afterPhotoUrl,message:'Saved in beta browser only'};
@@ -1020,10 +1012,10 @@
         const response=await nativeFetch(url.href,{method:'GET'});
         const remote=await response.clone().json();
         if (!state.initialized && remote.status==='success') {
-          state={...state,initialized:true,assets:Array.isArray(remote.assets)?remote.assets:[],logs:Array.isArray(remote.logs)?remote.logs:[],notices:Array.isArray(remote.notices)?remote.notices:[],icons:Array.isArray(remote.icons)?remote.icons:[],iconsInitialized:remote.iconsInitialized!==false,users:[],liveUserIds:(remote.users||[]).map(u=>String(u.id||'').trim().toUpperCase())};
+          state={...state,initialized:true,assets:Array.isArray(remote.assets)?remote.assets:[],logs:Array.isArray(remote.logs)?remote.logs:[],notices:Array.isArray(remote.notices)?remote.notices:[],icons:Array.isArray(remote.icons)?remote.icons:[],iconsInitialized:remote.iconsInitialized!==false,users:[],passwordOverrides:state.passwordOverrides||{},liveUsers:(remote.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})),liveUserIds:(remote.users||[]).map(u=>String(u.id||'').trim().toUpperCase())};
           write(STATE_KEY,state);
         }
-        if (remote.status==='success') return jsonResponse({...remote,assets:state.assets,logs:state.logs,notices:state.notices,icons:state.icons,iconsInitialized:state.iconsInitialized,users:[...(remote.users||[]),...(state.users||[])]});
+        if (remote.status==='success') { const publicUsers=(remote.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); const betaUsers=(state.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); return jsonResponse({...remote,assets:state.assets,logs:state.logs,notices:state.notices,icons:state.icons,iconsInitialized:state.iconsInitialized,users:[...publicUsers,...betaUsers]}); }
         return response;
       }
       if (action==='getNotices') return jsonResponse({status:'success',notices:state.notices});
@@ -1088,25 +1080,25 @@
 
     // --- 100% HARDCODED DIRECT ROSTER MAP ---
     const ROSTER_MAP = {
-      "ADMIN": { id: 'admin', pass: 'Admin123', name: 'Satish M (Admin)', role: 'admin', team: 'ALL' },
-      "GGS/HYD/015": { id: 'GGS/HYD/015', pass: 'GGS/HYD/015', name: 'Matte Devendar', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/022": { id: 'GGS/HYD/022', pass: 'GGS/HYD/022', name: 'Muthineni Satish', role: 'tech', team: 'HMT' },
-      "GGS/HYD/010": { id: 'GGS/HYD/010', pass: 'GGS/HYD/010', name: 'Mekala Mahesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/017": { id: 'GGS/HYD/017', pass: 'GGS/HYD/017', name: 'Arra Chiranjeevi', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/024": { id: 'GGS/HYD/024', pass: 'GGS/HYD/024', name: 'Deshamaina Praveen Kumar', role: 'tech', team: 'HMT' },
-      "GGS/HYD/025": { id: 'GGS/HYD/025', pass: 'GGS/HYD/025', name: 'Dontharaboina Mahesh Kumar', role: 'tech', team: 'HMT' },
-      "GGS/HYD/019": { id: 'GGS/HYD/019', pass: 'GGS/HYD/019', name: 'Dontharaboina Nagaraju', role: 'tech', team: 'HMT' },
-      "GGS/HYD/016": { id: 'GGS/HYD/016', pass: 'GGS/HYD/016', name: 'Jupalli Naresh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/035": { id: 'GGS/HYD/035', pass: 'GGS/HYD/035', name: 'Md Dilshan Alam', role: 'tech', team: 'HMT' },
-      "GGS/HYD/003": { id: 'GGS/HYD/003', pass: 'GGS/HYD/003', name: 'Moluguri Dinesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/020": { id: 'GGS/HYD/020', pass: 'GGS/HYD/020', name: 'Nimmala Madhu', role: 'tech', team: 'HMT' },
-      "GGS/HYD/008": { id: 'GGS/HYD/008', pass: 'GGS/HYD/008', name: 'K.Rajesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/009": { id: 'GGS/HYD/009', pass: 'GGS/HYD/009', name: 'Rathod Ramesh', role: 'tech', team: 'KPHB' },
-      "GGS/HYD/036": { id: 'GGS/HYD/036', pass: 'GGS/HYD/036', name: 'Salendra yadagiri', role: 'tech', team: 'HMT' },
-      "GGS/HYD/018": { id: 'GGS/HYD/018', pass: 'GGS/HYD/018', name: 'Vagamari Sai', role: 'tech', team: 'HMT' },
-      "GGS/HYD/037": { id: 'GGS/HYD/037', pass: 'GGS/HYD/037', name: 'Yavapuram Anilkumar', role: 'tech', team: 'HMT' },
-      "GGS/HYD/038": { id: 'GGS/HYD/038', pass: 'GGS/HYD/038', name: 'Md Sadab', role: 'tech', team: 'HMT' },
-      "GGS/HYD/023": { id: 'GGS/HYD/023', pass: 'GGS/HYD/023', name: 'Naralakanti Vijay', role: 'tech', team: 'KPHB' }
+      "ADMIN": { id: 'admin', name: 'Satish M (Admin)', role: 'admin', team: 'ALL' },
+      "GGS/HYD/015": { id: 'GGS/HYD/015', name: 'Matte Devendar', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/022": { id: 'GGS/HYD/022', name: 'Muthineni Satish', role: 'tech', team: 'HMT' },
+      "GGS/HYD/010": { id: 'GGS/HYD/010', name: 'Mekala Mahesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/017": { id: 'GGS/HYD/017', name: 'Arra Chiranjeevi', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/024": { id: 'GGS/HYD/024', name: 'Deshamaina Praveen Kumar', role: 'tech', team: 'HMT' },
+      "GGS/HYD/025": { id: 'GGS/HYD/025', name: 'Dontharaboina Mahesh Kumar', role: 'tech', team: 'HMT' },
+      "GGS/HYD/019": { id: 'GGS/HYD/019', name: 'Dontharaboina Nagaraju', role: 'tech', team: 'HMT' },
+      "GGS/HYD/016": { id: 'GGS/HYD/016', name: 'Jupalli Naresh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/035": { id: 'GGS/HYD/035', name: 'Md Dilshan Alam', role: 'tech', team: 'HMT' },
+      "GGS/HYD/003": { id: 'GGS/HYD/003', name: 'Moluguri Dinesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/020": { id: 'GGS/HYD/020', name: 'Nimmala Madhu', role: 'tech', team: 'HMT' },
+      "GGS/HYD/008": { id: 'GGS/HYD/008', name: 'K.Rajesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/009": { id: 'GGS/HYD/009', name: 'Rathod Ramesh', role: 'tech', team: 'KPHB' },
+      "GGS/HYD/036": { id: 'GGS/HYD/036', name: 'Salendra yadagiri', role: 'tech', team: 'HMT' },
+      "GGS/HYD/018": { id: 'GGS/HYD/018', name: 'Vagamari Sai', role: 'tech', team: 'HMT' },
+      "GGS/HYD/037": { id: 'GGS/HYD/037', name: 'Yavapuram Anilkumar', role: 'tech', team: 'HMT' },
+      "GGS/HYD/038": { id: 'GGS/HYD/038', name: 'Md Sadab', role: 'tech', team: 'HMT' },
+      "GGS/HYD/023": { id: 'GGS/HYD/023', name: 'Naralakanti Vijay', role: 'tech', team: 'KPHB' }
     };
 
     const INITIAL_ASSETS = [
@@ -1163,6 +1155,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      safeStore.remove('bgl_custom_passwords');
       loadStoredAppData();
       checkSession();
       if (currentUser) restoreMaintenanceDraftOnStartup();
@@ -1226,39 +1219,24 @@
 
     // --- INSTANT BULLETPROOF AUTHENTICATION ---
     async function executeLogin() {
-      const uRaw = document.getElementById('loginUsername').value || '';
-      const pRaw = document.getElementById('loginPassword').value || '';
-      const err = document.getElementById('loginError');
-      const u = sanitizeKey(uRaw), p = pRaw.trim();
-      if (!u || !p) { err.textContent = 'Please enter both User ID and Password'; err.classList.remove('hidden'); return; }
-      const button = document.querySelector('#loginSection button[onclick="executeLogin()"]');
-      if (button) { button.disabled=true; button.dataset.originalText=button.innerHTML; button.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Checking beta sign-in…'; }
-      try {
-        let customPasses={}; try { customPasses=JSON.parse(localStorage.getItem('bgl_custom_passwords')||'{}'); } catch (_) {}
-        let user=ROSTER_MAP[u];
-        const matches = candidate => { const saved=customPasses[candidate?.id]; const actual=saved||candidate?.pass||candidate?.password||''; return !!candidate && sanitizeKey(candidate.id)===u && (p===String(actual).trim() || p.toUpperCase()===String(actual).trim().toUpperCase()); };
-        if (user) {
-          const expected=customPasses[user.id]||user.pass;
-          if (!(p===expected || p.toUpperCase()===String(expected).toUpperCase() || p==='1234' || p.toUpperCase()===u)) user=null;
-        }
-        if (!user) {
-          let records=cloudTechnicians||[];
-          if (!records.some(matches)) {
-            try { const response=await fetch(`${CLOUD_API_URL}?action=getData`); const data=await response.json(); records=data.users||[]; } catch (_) {}
-          }
-          const found=records.find(matches);
-          if(found) user={id:found.id,name:found.name,team:found.team||'',role:String(found.role||'tech').toLowerCase(),pass:found.pass||found.password||p};
-        }
-        if (!user) { err.textContent='Invalid User ID or Password.'; err.classList.remove('hidden'); return; }
-        const expected=customPasses[user.id]||user.pass;
-        currentUser={...user,pass:expected};
-        try { localStorage.setItem('bgl_auth_user',JSON.stringify({id:currentUser.id,name:currentUser.name,role:currentUser.role,team:currentUser.team})); sessionStorage.removeItem('bgl_auth_user'); } catch (_) {}
-        err.classList.add('hidden');
+      const id=(document.getElementById('loginUsername').value||'').trim().toUpperCase();
+      const password=document.getElementById('loginPassword').value||'';
+      const error=document.getElementById('loginError');
+      if(!id||!password){error.textContent='Please enter both User ID and Password';error.classList.remove('hidden');return;}
+      const button=document.querySelector('#loginSection button[onclick="executeLogin()"]');
+      if(button){button.disabled=true;button.dataset.originalText=button.innerHTML;button.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Checking beta sign-in…';}
+      try{
+        const response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'authenticate',id,password})});
+        const result=await response.json();
+        if(!response.ok||result.status!=='success'||!result.user){error.textContent=result.message||'Invalid User ID or Password.';error.classList.remove('hidden');return;}
+        currentUser={...result.user,role:String(result.user.role||'tech').toLowerCase()};
+        localStorage.setItem('bgl_auth_user',JSON.stringify({id:currentUser.id,name:currentUser.name,role:currentUser.role,team:currentUser.team}));
+        sessionStorage.removeItem('bgl_auth_user');error.classList.add('hidden');
         document.getElementById('loginSection').style.setProperty('display','none','important');
         const appCon=document.getElementById('appContainer');appCon.style.setProperty('display','flex','important');appCon.classList.remove('hidden');
         initAppView();restoreMaintenanceDraftOnStartup();showToast(`Welcome to beta, ${currentUser.name}!`);
-      } catch (loginErr) { err.textContent='Could not check sign-in. Check your connection and try again.';err.classList.remove('hidden'); }
-      finally { if(button){button.disabled=false;button.innerHTML=button.dataset.originalText||'Sign in';} }
+      }catch(err){error.textContent='Could not verify sign-in. The Apps Script authentication update must be deployed first.';error.classList.remove('hidden');}
+      finally{if(button){button.disabled=false;button.innerHTML=button.dataset.originalText||'Sign In';}}
     }
 
     function togglePassVisibility() {
@@ -1348,74 +1326,20 @@
       const tbody = document.getElementById('teamMembersTableBody');
       if (!tbody) return;
       tbody.innerHTML = '';
-
-      let customPasses = {};
-      try {
-        const storedCP = safeStore.get('bgl_custom_passwords');
-        if (storedCP) customPasses = JSON.parse(storedCP);
-      } catch(e) {}
-
-      const staff = new Map(Object.values(ROSTER_MAP).map(u => [sanitizeKey(u.id), u]));
-      cloudTechnicians.forEach(u => { if (!staff.has(sanitizeKey(u.id))) staff.set(sanitizeKey(u.id), u); });
-      staff.forEach(u => {
-        const currentPass = customPasses[u.id] || u.pass || u.password || '';
-        const roleLabel = String(u.role || 'tech').toLowerCase() === 'admin' ? 'Admin' : 'Technician';
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-800/40 transition';
-        tr.innerHTML = `
-          <td class="p-2.5 font-mono text-white font-bold">${u.id}</td>
-          <td class="p-2.5 text-slate-300">${u.name}</td>
-          <td class="p-2.5 font-mono text-teal-300 font-bold tracking-wider">${currentPass}</td>
+      const staff = new Map(Object.values(ROSTER_MAP).map(user => [sanitizeKey(user.id), user]));
+      cloudTechnicians.forEach(user => { if (!staff.has(sanitizeKey(user.id))) staff.set(sanitizeKey(user.id), user); });
+      staff.forEach(user => {
+        const roleLabel = String(user.role || 'tech').toLowerCase() === 'admin' ? 'Admin' : 'Technician';
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-800/40 transition';
+        row.innerHTML = `
+          <td class="p-2.5 font-mono text-white font-bold">${user.id}</td>
+          <td class="p-2.5 text-slate-300">${user.name}</td>
           <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] ${roleLabel === 'Admin' ? 'text-rose-300' : 'text-teal-300'}">${roleLabel}</span></td>
-          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${u.team || '—'}</span></td>
-          <td class="p-2.5 text-right whitespace-nowrap">
-            <button onclick="openEditUserModal('${u.id}')" title="Edit Password" class="p-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700">
-              <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Password
-            </button>
-          </td>
+          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${user.team || '—'}</span></td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(row);
       });
-    }
-
-    function openEditUserModal(userId) {
-      const user = Object.values(ROSTER_MAP).find(u => u.id === userId);
-      if (!user) return;
-
-      let customPasses = {};
-      try {
-        const storedCP = safeStore.get('bgl_custom_passwords');
-        if (storedCP) customPasses = JSON.parse(storedCP);
-      } catch(e) {}
-
-      document.getElementById('editUserOldId').value = user.id;
-      document.getElementById('editUserId').value = user.id;
-      document.getElementById('editUserName').value = user.name;
-      document.getElementById('editUserPass').value = customPasses[user.id] || user.pass;
-
-      const teamSelect = document.getElementById('editUserTeamSelect');
-      teamSelect.innerHTML = teams.map(t => `<option value="${t}" ${t === user.team ? 'selected' : ''}>${t}</option>`).join('');
-
-      openModal('editUserModal');
-    }
-
-    function saveUserChanges(e) {
-      e.preventDefault();
-      const targetId = document.getElementById('editUserOldId').value;
-      const newPass = document.getElementById('editUserPass').value.trim();
-
-      let customPasses = {};
-      try {
-        const storedCP = safeStore.get('bgl_custom_passwords');
-        if (storedCP) customPasses = JSON.parse(storedCP);
-      } catch(e) {}
-
-      customPasses[targetId] = newPass;
-      safeStore.set('bgl_custom_passwords', JSON.stringify(customPasses));
-
-      renderTeamMembers();
-      closeModal('editUserModal');
-      showToast(`Password updated for ${targetId}!`);
     }
 
     async function saveNewTeamMember(e) {
@@ -1428,9 +1352,9 @@
       if(!id||!name||!pass||!role||!team)return showToast('Complete all staff account fields.');
       try {
         await postCloudAction({action:'addUser',id,name,pass,team,role});
-        ROSTER_MAP[id]={id,name,pass,team,role};
+        ROSTER_MAP[id]={id,name,team,role};
         cloudTechnicians=cloudTechnicians.filter(u=>sanitizeKey(u.id)!==sanitizeKey(id));
-        if(role!=='admin') cloudTechnicians.push({id,name,pass,team,role});
+        if(role!=='admin') cloudTechnicians.push({id,name,team,role});
         renderTeamsUI();renderTeamMembers();document.getElementById('addMemberForm').reset();
         showToast(`Beta account ${id} added in this browser only.`);
       } catch(err) { showToast(`Could not save beta account: ${err.message}`); }
@@ -1457,33 +1381,22 @@
       openModal('ownPasswordModal');
     }
 
-    function saveOwnPassword(event) {
+    async function saveOwnPassword(event) {
       event.preventDefault();
-      const error = document.getElementById('ownPasswordError');
-      const current = document.getElementById('ownPasswordCurrent').value;
-      const next = document.getElementById('ownPasswordNew').value;
-      const confirmNext = document.getElementById('ownPasswordConfirm').value;
-      let customPasses = {};
-      try { customPasses = JSON.parse(localStorage.getItem('bgl_custom_passwords') || '{}'); } catch (_) {}
-      const fail = message => { error.textContent = message; error.classList.remove('hidden'); };
-      if (!currentUser || currentUser.role === 'admin') return;
-      const expected = customPasses[currentUser.id] || currentUser.pass || '';
-      if (current !== expected) return fail('Current password is incorrect.');
-      if (next.trim().length < 6) return fail('Use at least 6 characters for the new password.');
-      if (next !== confirmNext) return fail('The new passwords do not match.');
-      customPasses[currentUser.id] = next;
-      localStorage.setItem('bgl_custom_passwords', JSON.stringify(customPasses));
-      currentUser.pass = next;
-      closeModal('ownPasswordModal');
-      showToast('Password changed for this beta browser.');
-    }
-
-    function resetDefaultStaffRoster() {
-      if (confirm("Reset modified passwords back to default?")) {
-        safeStore.remove('bgl_custom_passwords');
-        renderTeamMembers();
-        showToast("Passwords reset to default!");
-      }
+      const error=document.getElementById('ownPasswordError');
+      const currentPassword=document.getElementById('ownPasswordCurrent').value;
+      const newPassword=document.getElementById('ownPasswordNew').value;
+      const confirmPassword=document.getElementById('ownPasswordConfirm').value;
+      const fail=message=>{error.textContent=message;error.classList.remove('hidden');};
+      if(!currentUser||currentUser.role==='admin')return;
+      if(newPassword.trim().length<6)return fail('Use at least 6 characters for the new password.');
+      if(newPassword!==confirmPassword)return fail('The new passwords do not match.');
+      try{
+        const response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'changeOwnPassword',id:currentUser.id,currentPassword,newPassword})});
+        const result=await response.json();
+        if(!response.ok||result.status!=='success')throw new Error(result.message||'Could not update password');
+        closeModal('ownPasswordModal');showToast('Beta password changed in this browser only.');
+      }catch(err){fail(err.message||'Could not change the password.');}
     }
 
     // --- CLOUD TECHNICIAN REMINDERS ---
@@ -2716,7 +2629,7 @@
         if (json.status === "success") {
           if (Array.isArray(json.users)) {
             cloudTechnicians = json.users.map(user => ({
-              id: user.id, name: user.name, pass: user.pass || user.password || "", team: user.team || "",
+              id: user.id, name: user.name, team: user.team || "",
               role: String(user.role || "tech").toLowerCase()
             })).filter(user => user.name && ["tech", "technician", "admin"].includes(user.role));
             if (currentUser && currentUser.role === "admin") renderTeamsUI();
