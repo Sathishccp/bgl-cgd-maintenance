@@ -153,6 +153,10 @@
             </button>
           </div>
 
+          <button id="changeOwnPasswordButton" onclick="openOwnPasswordModal()" class="hidden px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 flex items-center gap-1" title="Change your password">
+            <i class="fa-solid fa-key"></i><span class="hidden sm:inline">Password</span>
+          </button>
+
           <button onclick="openProgressModal()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 flex items-center gap-1">
             <i class="fa-solid fa-chart-line"></i> <span class="hidden sm:inline">Progress</span>
           </button>
@@ -428,10 +432,14 @@
 
       <form id="addMemberForm" onsubmit="saveNewTeamMember(event)" class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2.5 mb-4">
         <h4 class="font-bold text-teal-300 flex items-center gap-1"><i class="fa-solid fa-user-plus"></i> Add New Staff Login</h4>
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
           <input type="text" id="newUserId" required placeholder="User ID (e.g. GGS/HYD/039)" class="p-2 bg-slate-950 border border-slate-700 rounded text-white uppercase font-mono">
           <input type="text" id="newUserName" required placeholder="Full Name" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
-          <input type="text" id="newUserPass" required placeholder="Password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+          <input type="text" id="newUserPass" required placeholder="Temporary password" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+          <select id="newUserRoleSelect" required onchange="updateNewUserRoleFields()" class="p-2 bg-slate-950 border border-slate-700 rounded text-white">
+            <option value="tech">Technician</option>
+            <option value="admin">Admin</option>
+          </select>
           <select id="newUserTeamSelect" required class="p-2 bg-slate-950 border border-slate-700 rounded text-white"></select>
         </div>
         <div class="flex justify-end">
@@ -450,6 +458,7 @@
               <th class="p-2.5">User ID</th>
               <th class="p-2.5">Name</th>
               <th class="p-2.5">Password</th>
+              <th class="p-2.5">Role</th>
               <th class="p-2.5">Team</th>
               <th class="p-2.5 text-right">Action</th>
             </tr>
@@ -488,6 +497,26 @@
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
           <button type="button" onclick="closeModal('editUserModal')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded">Cancel</button>
           <button type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Technician Self-Service Password Modal -->
+  <div id="ownPasswordModal" class="hidden fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-3">
+    <div class="glass-card w-full max-w-sm p-5 rounded-2xl border border-slate-700 text-xs">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+        <div><h3 class="text-sm font-bold text-white"><i class="fa-solid fa-key text-amber-400 mr-1"></i> Change My Password</h3><p class="text-slate-400 mt-1">Update your staff account password</p></div>
+        <button type="button" onclick="closeModal('ownPasswordModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="ownPasswordForm" onsubmit="saveOwnPassword(event)" class="space-y-3">
+        <label class="block text-slate-400">Current password<input id="ownPasswordCurrent" type="password" autocomplete="current-password" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></label>
+        <label class="block text-slate-400">New password (at least 6 characters)<input id="ownPasswordNew" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></label>
+        <label class="block text-slate-400">Confirm new password<input id="ownPasswordConfirm" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></label>
+        <p id="ownPasswordError" class="hidden text-rose-300"></p>
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('ownPasswordModal')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded">Cancel</button>
+          <button id="ownPasswordSaveButton" type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Password</button>
         </div>
       </form>
     </div>
@@ -1074,53 +1103,57 @@
     }
 
     // --- INSTANT BULLETPROOF AUTHENTICATION ---
-    function executeLogin() {
+    async function executeLogin() {
       const uRaw = document.getElementById('loginUsername').value || '';
       const pRaw = document.getElementById('loginPassword').value || '';
       const err = document.getElementById('loginError');
-
-      const u = sanitizeKey(uRaw);
-      const p = pRaw.trim();
-
-      if (!u || !p) {
-        err.textContent = "Please enter both User ID and Password";
-        err.classList.remove('hidden');
-        return;
-      }
-
-      // Check if Admin modified passwords
-      let customPasses = {};
+      const u = sanitizeKey(uRaw), p = pRaw.trim();
+      if (!u || !p) { err.textContent = 'Please enter both User ID and Password'; err.classList.remove('hidden'); return; }
+      const button = document.querySelector('#loginSection button[onclick="executeLogin()"]');
+      if (button) { button.disabled = true; button.dataset.originalText = button.innerHTML; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking sign-in…'; }
       try {
-        const storedCP = safeStore.get('bgl_custom_passwords');
-        if (storedCP) customPasses = JSON.parse(storedCP);
-      } catch(e) {}
+        let customPasses = {};
+        try { customPasses = JSON.parse(safeStore.get('bgl_custom_passwords') || '{}'); } catch (_) {}
+        let cloudAccount = null;
+        try {
+          const response = await fetch(`${CLOUD_API_URL}?action=getData`);
+          const data = await response.json();
+          if (data.status === 'success' && Array.isArray(data.users)) {
+            cloudAccount = data.users.find(record => sanitizeKey(record.id) === u) || null;
+            cloudTechnicians = data.users.map(record => ({ id:record.id, name:record.name, pass:record.pass||record.password||'', team:record.team||'', role:String(record.role||'tech').toLowerCase() }));
+          }
+        } catch (_) { /* Allow configured local roster login if the cloud is temporarily unavailable. */ }
 
-      // Direct Roster Lookup (O(1) Exact Match)
-      const user = ROSTER_MAP[u];
-
-      if (user) {
-        const expectedPass = customPasses[user.id] || user.pass;
-        // Allows: Exact password OR Emergency Master PIN '1234' OR ID as Password
-        if (p === expectedPass || p.toUpperCase() === expectedPass.toUpperCase() || p === '1234' || p.toUpperCase() === u) {
-          currentUser = { ...user, pass: expectedPass };
-          try { localStorage.setItem('bgl_auth_user', JSON.stringify({ id: currentUser.id, name: currentUser.name, role: currentUser.role, team: currentUser.team })); sessionStorage.removeItem('bgl_auth_user'); } catch(e) {}
-          err.classList.add('hidden');
-
-          // Switch screen
-          document.getElementById('loginSection').style.setProperty('display', 'none', 'important');
-          const appCon = document.getElementById('appContainer');
-          appCon.style.setProperty('display', 'flex', 'important');
-          appCon.classList.remove('hidden');
-
-          initAppView();
-          restoreMaintenanceDraftOnStartup();
-          showToast(`Welcome, ${currentUser.name}!`);
-          return;
+        let user = null;
+        if (cloudAccount) {
+          const expected = cloudAccount.pass || cloudAccount.password || '';
+          if (p === String(expected).trim()) {
+            user = { id:cloudAccount.id, name:cloudAccount.name, team:cloudAccount.team||'', role:String(cloudAccount.role||'tech').toLowerCase(), pass:expected };
+          }
+        } else {
+          const rosterUser = ROSTER_MAP[u];
+          if (rosterUser) {
+            const expected = customPasses[rosterUser.id] || rosterUser.pass;
+            if (p === expected || p.toUpperCase() === String(expected).toUpperCase() || p === '1234' || p.toUpperCase() === u) user = { ...rosterUser, pass:expected };
+          }
         }
+        if (!user) { err.textContent = 'Invalid User ID or Password.'; err.classList.remove('hidden'); return; }
+        currentUser = user;
+        try { localStorage.setItem('bgl_auth_user', JSON.stringify({ id:currentUser.id, name:currentUser.name, role:currentUser.role, team:currentUser.team })); sessionStorage.removeItem('bgl_auth_user'); } catch (_) {}
+        err.classList.add('hidden');
+        document.getElementById('loginSection').style.setProperty('display', 'none', 'important');
+        const appCon = document.getElementById('appContainer');
+        appCon.style.setProperty('display', 'flex', 'important');
+        appCon.classList.remove('hidden');
+        initAppView();
+        restoreMaintenanceDraftOnStartup();
+        showToast(`Welcome, ${currentUser.name}!`);
+      } catch (loginErr) {
+        err.textContent = 'Could not check sign-in. Check your connection and try again.';
+        err.classList.remove('hidden');
+      } finally {
+        if (button) { button.disabled = false; button.innerHTML = button.dataset.originalText || 'Sign In'; }
       }
-
-      err.textContent = "Invalid User ID or Password. (Emergency PIN: 1234)";
-      err.classList.remove('hidden');
     }
 
     function togglePassVisibility() {
@@ -1171,6 +1204,8 @@
         document.getElementById('userZoneLabel').textContent = `${currentUser.name} (${currentUser.team})`;
         const selectionHeader = document.getElementById('assetSelectionHeader');
         if (selectionHeader) selectionHeader.classList.toggle('hidden', currentUser.role !== 'admin');
+        const selfPasswordButton = document.getElementById('changeOwnPasswordButton');
+        if (selfPasswordButton) selfPasswordButton.classList.toggle('hidden', currentUser.role === 'admin');
         const headerNotifications = document.getElementById('enableHeaderNotifications');
         if (headerNotifications) {
           headerNotifications.classList.toggle('hidden', currentUser.role === 'admin');
@@ -1215,15 +1250,19 @@
         if (storedCP) customPasses = JSON.parse(storedCP);
       } catch(e) {}
 
-      Object.values(ROSTER_MAP).forEach(u => {
-        const currentPass = customPasses[u.id] || u.pass;
+      const staff = new Map(Object.values(ROSTER_MAP).map(u => [sanitizeKey(u.id), u]));
+      cloudTechnicians.forEach(u => { if (!staff.has(sanitizeKey(u.id))) staff.set(sanitizeKey(u.id), u); });
+      staff.forEach(u => {
+        const currentPass = customPasses[u.id] || u.pass || u.password || '';
+        const roleLabel = String(u.role || 'tech').toLowerCase() === 'admin' ? 'Admin' : 'Technician';
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-800/40 transition';
         tr.innerHTML = `
           <td class="p-2.5 font-mono text-white font-bold">${u.id}</td>
           <td class="p-2.5 text-slate-300">${u.name}</td>
           <td class="p-2.5 font-mono text-teal-300 font-bold tracking-wider">${currentPass}</td>
-          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${u.team}</span></td>
+          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] ${roleLabel === 'Admin' ? 'text-rose-300' : 'text-teal-300'}">${roleLabel}</span></td>
+          <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-amber-300">${u.team || '—'}</span></td>
           <td class="p-2.5 text-right whitespace-nowrap">
             <button onclick="openEditUserModal('${u.id}')" title="Edit Password" class="p-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700">
               <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Password
@@ -1235,7 +1274,7 @@
     }
 
     function openEditUserModal(userId) {
-      const user = Object.values(ROSTER_MAP).find(u => u.id === userId);
+      const user = Object.values(ROSTER_MAP).find(u => u.id === userId) || cloudTechnicians.find(u => u.id === userId);
       if (!user) return;
 
       let customPasses = {};
@@ -1274,18 +1313,87 @@
       showToast(`Password updated for ${targetId}!`);
     }
 
-    function saveNewTeamMember(e) {
+    async function saveNewTeamMember(e) {
       e.preventDefault();
       const id = document.getElementById('newUserId').value.trim().toUpperCase();
       const name = document.getElementById('newUserName').value.trim();
       const pass = document.getElementById('newUserPass').value.trim();
-      const team = document.getElementById('newUserTeamSelect').value;
+      const role = document.getElementById('newUserRoleSelect').value;
+      const team = role === 'admin' ? 'ALL' : document.getElementById('newUserTeamSelect').value;
+      if (!id || !name || !pass || !role || !team) return showToast('Complete all staff account fields.');
+      try {
+        await postCloudAction({ action: 'addUser', id, name, pass, team, role });
+        ROSTER_MAP[sanitizeKey(id)] = { id, name, pass, team, role };
+        cloudTechnicians = cloudTechnicians.filter(user => sanitizeKey(user.id) !== sanitizeKey(id));
+        if (role !== 'admin') cloudTechnicians.push({ id, name, pass, team, role });
+        renderTeamsUI();
+        renderTeamMembers();
+        document.getElementById('addMemberForm').reset();
+        showToast(`${role === 'admin' ? 'Admin' : 'Technician'} account ${id} created.`);
+      } catch (err) {
+        showToast(`Could not create account: ${err.message}`);
+      }
+    }
 
-      ROSTER_MAP[id] = { id, name, pass, team, role: 'tech' };
-      renderTeamsUI();
-      renderTeamMembers();
-      document.getElementById('addMemberForm').reset();
-      showToast(`Account ${id} added to live session!`);
+    function updateNewUserRoleFields() {
+      const role = document.getElementById('newUserRoleSelect')?.value || 'tech';
+      const teamSelect = document.getElementById('newUserTeamSelect');
+      if (!teamSelect) return;
+      const allOption = [...teamSelect.options].find(option => option.value === 'ALL');
+      if (role === 'admin') {
+        if (!allOption) teamSelect.insertAdjacentHTML('beforeend', '<option value="ALL">ALL (Admin)</option>');
+        teamSelect.value = 'ALL';
+      } else if (teamSelect.value === 'ALL') {
+        const firstTeam = [...teamSelect.options].find(option => option.value && option.value !== 'ALL');
+        teamSelect.value = firstTeam?.value || '';
+      }
+    }
+
+    function openOwnPasswordModal() {
+      if (!currentUser || currentUser.role === 'admin') return;
+      document.getElementById('ownPasswordForm').reset();
+      document.getElementById('ownPasswordError').classList.add('hidden');
+      openModal('ownPasswordModal');
+    }
+
+    async function saveOwnPassword(event) {
+      event.preventDefault();
+      const error = document.getElementById('ownPasswordError');
+      const button = document.getElementById('ownPasswordSaveButton');
+      const current = document.getElementById('ownPasswordCurrent').value;
+      const next = document.getElementById('ownPasswordNew').value.trim();
+      const confirmNext = document.getElementById('ownPasswordConfirm').value.trim();
+      const fail = message => { error.textContent = message; error.classList.remove('hidden'); };
+      if (!currentUser || currentUser.role === 'admin') return;
+      if (next.length < 6) return fail('Use at least 6 characters for the new password.');
+      if (next !== confirmNext) return fail('The new passwords do not match.');
+      button.disabled = true;
+      button.textContent = 'Updating…';
+      try {
+        const response = await fetch(`${CLOUD_API_URL}?action=getData`);
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Could not verify the current password');
+        const account = (data.users || []).find(user => sanitizeKey(user.id) === sanitizeKey(currentUser.id));
+        if (!account || String(account.pass || account.password || '').trim() !== current.trim()) {
+          return fail('Current password is incorrect.');
+        }
+        await postCloudAction({
+          action: 'addUser', id: account.id, name: account.name, pass: next,
+          team: account.team || currentUser.team || '', role: account.role || currentUser.role || 'tech'
+        });
+        currentUser.pass = next;
+        delete customPasses[currentUser.id];
+        safeStore.set('bgl_custom_passwords', JSON.stringify(customPasses));
+        const index = cloudTechnicians.findIndex(user => sanitizeKey(user.id) === sanitizeKey(currentUser.id));
+        if (index >= 0) cloudTechnicians[index] = { ...cloudTechnicians[index], pass: next };
+        closeModal('ownPasswordModal');
+        showToast('Password updated. Use your new password the next time you sign in.');
+      } catch (err) {
+        fail(err.message || 'Could not update the password. Try again.');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save Password';
+      }
     }
 
     function resetDefaultStaffRoster() {
@@ -1748,11 +1856,11 @@
           let marker;
           if (customIcons[asset.type]) {
             const iconHtml = `
-              <div style="position:relative; width:32px; height:32px; border-radius:50%; border:2px solid ${info.color}; background:#0f172a; display:flex; align-items:center; justify-content:center; box-shadow:0 0 8px ${info.color}88;">
-                <img src="${customIcons[asset.type]}" style="width:20px; height:20px; object-fit:contain;" />
+              <div style="position:relative; width:42px; height:42px; box-sizing:border-box; border-radius:50%; border:2px solid ${info.color}; background:rgba(255,255,255,.94); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 7px rgba(15,23,42,.38);">
+                <img src="${customIcons[asset.type]}" alt="${asset.type} asset" style="display:block; width:32px; height:32px; object-fit:contain; filter:drop-shadow(0 1px 1px rgba(15,23,42,.35));" />
               </div>
             `;
-            const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [32, 32], iconAnchor: [16, 16] });
+            const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [42, 42], iconAnchor: [21, 21] });
             marker = L.marker([asset.lat, asset.lng], { icon: customIcon });
           } else {
             marker = L.circleMarker([asset.lat, asset.lng], {
@@ -2493,7 +2601,10 @@
       const assetTeamSelect = document.getElementById('newAssetTeamSelect');
       const singleTeamSelect = document.getElementById('singleAssignTeamSelect');
       const teamOptions = teams.map(team => `<option value="${team}">${team}</option>`).join('');
-      if (userTeamSelect) userTeamSelect.innerHTML = teamOptions;
+      if (userTeamSelect) {
+        userTeamSelect.innerHTML = `${teamOptions}<option value="ALL">ALL (Admin)</option>`;
+        updateNewUserRoleFields();
+      }
       if (assetTeamSelect) assetTeamSelect.innerHTML = teamOptions;
       if (singleTeamSelect) singleTeamSelect.innerHTML = teamOptions;
       populateBatchTechnicianSelect();
@@ -2523,10 +2634,10 @@
         if (json.status === "success") {
           if (Array.isArray(json.users)) {
             cloudTechnicians = json.users.map(user => ({
-              id: user.id, name: user.name, team: user.team || "",
+              id: user.id, name: user.name, pass: user.pass || user.password || "", team: user.team || "",
               role: String(user.role || "tech").toLowerCase()
-            })).filter(user => user.name && ["tech", "technician"].includes(user.role));
-            if (currentUser && currentUser.role === "admin") renderTeamsUI();
+            })).filter(user => user.name && ["tech", "technician", "admin"].includes(user.role));
+            if (currentUser && currentUser.role === "admin") { renderTeamsUI(); renderTeamMembers(); }
           }
           if (json.assets && json.assets.length) {
             const rawAssets = json.assets.map(a => ({
