@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BGL Staff Login Beta Check</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#070d18;color:#e2e8f0}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px}
+    main{width:min(100%,440px);background:#0f172a;border:1px solid #263449;border-radius:18px;padding:28px;box-shadow:0 20px 60px #0008}
+    .tag{display:inline-block;background:#78350f;color:#fde68a;border:1px solid #92400e;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
+    h1{font-size:22px;margin:16px 0 6px}p{color:#aab7c9;line-height:1.5;font-size:14px}
+    label{display:block;font-size:13px;margin:16px 0 6px;color:#cbd5e1}
+    input{width:100%;padding:12px;background:#080f1d;color:#fff;border:1px solid #334155;border-radius:9px;font-size:15px}
+    button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:9px;background:#0d9488;color:white;font-weight:700;font-size:15px;cursor:pointer}
+    button:disabled{opacity:.6;cursor:wait}.note{font-size:12px;color:#94a3b8;margin-top:16px}
+    #result{display:none;margin-top:16px;padding:12px;border-radius:9px;font-size:14px;line-height:1.5}
+    #result.ok{display:block;background:#064e3b66;border:1px solid #0f766e;color:#99f6e4}
+    #result.bad{display:block;background:#7f1d1d55;border:1px solid #991b1b;color:#fecaca}
+  </style>
+</head>
+<body>
+  <main>
+    <span class="tag">BETA · READ-ONLY LOGIN CHECK</span>
+    <h1>Staff sign-in check</h1>
+    <p>This separate page checks staff credentials against the shared Users sheet. It does not create accounts or change maintenance data.</p>
+    <form id="loginForm">
+      <label for="userId">Staff ID</label>
+      <input id="userId" autocomplete="username" required placeholder="Enter your staff ID">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
+      <button id="checkButton" type="submit">Check sign-in</button>
+    </form>
+    <div id="result" role="status" aria-live="polite"></div>
+    <p class="note">Use an existing account for this beta check. It will not sign you into the maintenance app.</p>
+  </main>
+  <script>
+    const USERS_API = 'https://script.google.com/macros/s/AKfycbylrzoqNj4M2kNaMpyVoB64VYulZYeNzTvNlhDS5NGVt_JVlM3Jrvxtcn94Nr0j52DbMg/exec';
+    const normalize = value => String(value ?? '').replace(/[\s\uFEFF\xA0]/g, '').trim().toUpperCase();
+    const form = document.getElementById('loginForm');
+    const button = document.getElementById('checkButton');
+    const result = document.getElementById('result');
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      button.disabled = true;
+      button.textContent = 'Checking…';
+      result.className = '';
+      result.style.display = 'block';
+      result.textContent = 'Loading the shared staff list…';
+      try {
+        const response = await fetch(`${USERS_API}?action=getData&_=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Staff service returned ${response.status}.`);
+        const data = await response.json();
+        if (data.status !== 'success' || !Array.isArray(data.users)) throw new Error(data.message || 'Could not load the shared staff list.');
+
+        const enteredId = normalize(document.getElementById('userId').value);
+        const enteredPassword = document.getElementById('password').value.trim();
+        const user = data.users.find(candidate =>
+          ['tech', 'technician'].includes(String(candidate.role || 'tech').trim().toLowerCase()) &&
+          (normalize(candidate.id) === enteredId || normalize(candidate.name) === enteredId)
+        );
+        if (!user) {
+          result.className = 'bad';
+          result.textContent = 'This ID is not in the shared Users sheet. An account added only in an older browser session must be created again after the login fix is published.';
+          return;
+        }
+        const expected = String(user.pass ?? user.password ?? '').trim();
+        if (!expected || enteredPassword.toUpperCase() !== expected.toUpperCase()) {
+          result.className = 'bad';
+          result.textContent = 'The staff ID was found, but the password does not match the shared account.';
+          return;
+        }
+        result.className = 'ok';
+        result.textContent = `Sign-in check passed for ${user.name} (${user.team || 'No team'}). The account is available in the shared Users sheet.`;
+      } catch (error) {
+        result.className = 'bad';
+        result.textContent = `Could not check sign-in: ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Check sign-in';
+      }
+    });
+  </script>
+</body>
+</html>
