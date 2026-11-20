@@ -12,6 +12,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- JSZip -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- XLSX reader for admin-only local Excel import (records are sent only after explicit admin submit). -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -155,6 +157,9 @@
             </button>
             <button onclick="openModal('reportsModal')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 flex items-center gap-1">
               <i class="fa-solid fa-file-invoice"></i> <span class="hidden md:inline">Reports</span>
+            </button>
+            <button onclick="openAdminAssetMaster()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 flex items-center gap-1" title="Admin-only customer and equipment database">
+              <i class="fa-solid fa-database"></i> <span class="hidden md:inline">Asset Data</span>
             </button>
             <button onclick="openModal('importModal')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 flex items-center gap-1">
               <i class="fa-solid fa-file-import"></i>
@@ -732,6 +737,56 @@
     </div>
   </div>
 
+  <!-- Admin-only detailed customer / equipment master. Source data is never embedded in this page. -->
+  <div id="adminAssetMasterModal" class="hidden fixed inset-0 z-[55] bg-black/85 flex items-center justify-center p-2 sm:p-4">
+    <div class="glass-card w-full max-w-6xl p-4 sm:p-5 rounded-2xl max-h-[95vh] overflow-y-auto border border-slate-700 text-xs">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-3 mb-3">
+        <div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-database text-emerald-400 mr-1"></i> Admin Asset Database</h3><p class="text-slate-400 mt-1">Customer and equipment details are available to admins only.</p></div>
+        <button onclick="closeAdminAssetMaster()" class="text-slate-400 hover:text-white p-1" aria-label="Close admin asset database"><i class="fa-solid fa-xmark fa-lg"></i></button>
+      </div>
+      <div class="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3 mb-3 space-y-2">
+        <div class="font-semibold text-emerald-300">Import or update the Excel master</div>
+        <p class="text-slate-400">The workbook is read in this browser. It is sent to the private database only after you choose Import. This action replaces the existing admin asset master.</p>
+        <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input id="adminAssetWorkbookInput" type="file" accept=".xlsx,.xls" onchange="previewAdminAssetWorkbook(this)" class="block w-full text-xs text-slate-300 file:mr-2 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white">
+          <button id="adminAssetImportButton" type="button" disabled onclick="importAdminAssetWorkbook()" class="px-3 py-2 rounded-lg bg-emerald-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">Import Excel to Admin Database</button>
+        </div>
+        <p id="adminAssetImportSummary" class="text-slate-300"></p>
+        <p id="adminAssetMasterStatus" class="text-amber-300"></p>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2 sm:items-center justify-between mb-3">
+        <div class="text-slate-300"><b id="adminAssetRecordCount">0</b> records</div>
+        <input id="adminAssetSearch" oninput="renderAdminAssetMasterList()" placeholder="Search customer, ID, meter, DRS or valve..." class="w-full sm:max-w-md p-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+      </div>
+      <div id="adminAssetMasterList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5"></div>
+    </div>
+  </div>
+
+  <div id="adminAssetDetailModal" class="hidden fixed inset-0 z-[65] bg-black/85 flex items-center justify-center p-2 sm:p-4">
+    <div class="glass-card w-full max-w-5xl p-4 sm:p-5 rounded-2xl max-h-[95vh] overflow-y-auto border border-slate-700 text-xs">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-3 mb-3">
+        <div class="min-w-0"><h3 id="adminAssetDetailTitle" class="text-base font-bold text-white truncate">Asset Details</h3><p id="adminAssetDetailSubtitle" class="text-slate-400 mt-1"></p></div>
+        <button onclick="closeModal('adminAssetDetailModal')" class="text-slate-400 hover:text-white p-1" aria-label="Close asset details"><i class="fa-solid fa-xmark fa-lg"></i></button>
+      </div>
+      <div id="adminAssetDetailGroups" class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4"></div>
+      <section class="border-t border-slate-800 pt-3">
+        <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-clock-rotate-left text-teal-300 mr-1"></i> Complete Activity History</h4>
+        <form id="adminAssetActivityForm" onsubmit="submitAdminAssetActivity(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 mb-3">
+          <select id="adminActivityType" required class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+            <option value="">Select activity</option><option>Maintenance</option><option>Temporary Disconnection (TD)</option><option>Permanent Disconnection (PD)</option><option>Reconnection / Activation</option><option>Meter Change</option><option>Regulator Change</option><option>EVC Change</option><option>CRV Change</option><option>Gauge Change</option><option>Filter Change</option><option>Skid Change</option><option>Other</option>
+          </select>
+          <input id="adminActivityDate" type="date" required class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityComponent" placeholder="Component (optional)" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityPreviousValue" placeholder="Previous value (optional)" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityNewValue" placeholder="New value (optional)" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityRemarks" placeholder="Details / remarks" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <button type="submit" class="px-3 py-2 rounded-lg bg-teal-700 text-white font-semibold lg:col-span-6"><i class="fa-solid fa-plus mr-1"></i> Add Activity to History</button>
+        </form>
+        <div id="adminAssetActivityList" class="space-y-2"></div>
+      </section>
+    </div>
+  </div>
+
   <!-- In-page photo viewer: keeps technicians inside the maintenance page. -->
   <div id="photoPreviewModal" class="hidden fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-3 sm:p-6" onclick="if(event.target===this)closePhotoPreview()">
     <div class="glass-card w-full max-w-5xl rounded-2xl overflow-hidden flex flex-col max-h-[94vh]">
@@ -1152,6 +1207,12 @@
     let cloudTechnicians = [];
     let customIcons = {};
     let currentUser = null;
+    let adminSessionToken = sessionStorage.getItem('bgl_admin_session') || '';
+    let adminAssetColumns = [];
+    let adminAssetRecords = [];
+    let adminAssetActivities = [];
+    let pendingAdminAssetImport = null;
+    let selectedAdminAssetRecord = null;
     let assets = [];
     let maintenanceHistory = [];
     let cloudNotices = [];
@@ -1266,6 +1327,8 @@
         const result=await response.json();
         if(!response.ok||result.status!=='success'||!result.user){error.textContent=result.message||'Invalid User ID or Password.';error.classList.remove('hidden');return;}
         currentUser={...result.user,role:String(result.user.role||'tech').toLowerCase()};
+        adminSessionToken=String(result.sessionToken||'');
+        if(adminSessionToken) sessionStorage.setItem('bgl_admin_session',adminSessionToken); else sessionStorage.removeItem('bgl_admin_session');
         localStorage.setItem('bgl_auth_user',JSON.stringify({id:currentUser.id,name:currentUser.name,role:currentUser.role,team:currentUser.team}));
         sessionStorage.removeItem('bgl_auth_user');error.classList.add('hidden');
         document.getElementById('loginSection').style.setProperty('display','none','important');
@@ -1289,6 +1352,7 @@
 
     function checkSession() {
       try {
+        adminSessionToken = sessionStorage.getItem('bgl_admin_session') || '';
         const sess = localStorage.getItem('bgl_auth_user') || sessionStorage.getItem('bgl_auth_user');
         if (sess) {
           currentUser = JSON.parse(sess);
@@ -1306,7 +1370,15 @@
 
     function handleLogout() {
       persistMaintenanceDraftNow(true);
-      try { localStorage.removeItem('bgl_auth_user'); sessionStorage.removeItem('bgl_auth_user'); } catch(e) {}
+      try { localStorage.removeItem('bgl_auth_user'); sessionStorage.removeItem('bgl_auth_user'); sessionStorage.removeItem('bgl_admin_session'); } catch(e) {}
+      adminSessionToken = '';
+      adminAssetColumns = [];
+      adminAssetRecords = [];
+      adminAssetActivities = [];
+      pendingAdminAssetImport = null;
+      selectedAdminAssetRecord = null;
+      closeModal('adminAssetMasterModal');
+      closeModal('adminAssetDetailModal');
       currentUser = null;
       document.getElementById('appContainer').classList.add('hidden');
       document.getElementById('appContainer').style.setProperty('display', 'none', 'important');
@@ -2509,6 +2581,278 @@
       const synced = await syncAssetsToCloud(false);
       showToast(synced ? 'Assignment cleared' : 'Saved here, but cloud sync failed. Try Sync again.');
     }
+
+    function adminAssetApi(action, payload = {}) {
+      if (!currentUser || currentUser.role !== 'admin') return Promise.reject(new Error('Admin access required.'));
+      if (!adminSessionToken) return Promise.reject(new Error('Deploy the updated Apps Script first, then sign in again to enable the admin-only asset database.'));
+      return fetch(CLOUD_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, sessionToken: adminSessionToken, ...payload })
+      }).then(async response => {
+        const result = await response.json();
+        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Admin data request failed.');
+        return result;
+      });
+    }
+
+    function openAdminAssetMaster() {
+      if (!currentUser || currentUser.role !== 'admin') return showToast('Admin access required.');
+      document.getElementById('adminAssetMasterModal').classList.remove('hidden');
+      document.getElementById('adminAssetMasterStatus').textContent = '';
+      loadAdminAssetMaster();
+    }
+
+    function closeAdminAssetMaster() {
+      closeModal('adminAssetMasterModal');
+      adminAssetRecords = [];
+      adminAssetActivities = [];
+      adminAssetColumns = [];
+      document.getElementById('adminAssetMasterList').replaceChildren();
+    }
+
+    async function loadAdminAssetMaster() {
+      const status = document.getElementById('adminAssetMasterStatus');
+      status.textContent = 'Loading protected admin records…';
+      try {
+        const result = await adminAssetApi('getAdminAssetMaster');
+        adminAssetColumns = Array.isArray(result.columns) ? result.columns : [];
+        adminAssetRecords = Array.isArray(result.records) ? result.records : [];
+        adminAssetActivities = Array.isArray(result.activities) ? result.activities : [];
+        status.textContent = adminAssetRecords.length ? 'Admin data loaded securely.' : 'No admin asset master is imported yet.';
+        renderAdminAssetMasterList();
+      } catch (error) {
+        status.textContent = error.message;
+        adminAssetRecords = [];
+        renderAdminAssetMasterList();
+      }
+    }
+
+    function workbookCellText(sheet, row, column) {
+      const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
+      return cell ? String(XLSX.utils.format_cell(cell) || '').trim() : '';
+    }
+
+    function adminColumnSlug(value) {
+      return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || 'field';
+    }
+
+    async function previewAdminAssetWorkbook(input) {
+      pendingAdminAssetImport = null;
+      const button = document.getElementById('adminAssetImportButton');
+      const summary = document.getElementById('adminAssetImportSummary');
+      button.disabled = true;
+      summary.textContent = '';
+      if (!input.files || !input.files[0]) return;
+      if (currentUser?.role !== 'admin') return showToast('Admin access required.');
+      if (!window.XLSX) { summary.textContent = 'Excel reader did not load. Refresh the beta page and try again.'; return; }
+      try {
+        const workbook = XLSX.read(await input.files[0].arrayBuffer(), { type: 'array', cellDates: false });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet || !sheet['!ref']) throw new Error('The workbook has no readable first sheet.');
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        if (range.e.r < 2) throw new Error('Expected a section row, a header row, and at least one data row.');
+        const merges = sheet['!merges'] || [];
+        const columns = [];
+        const usedKeys = new Set();
+        for (let column = range.s.c; column <= range.e.c; column++) {
+          const merge = merges.find(item => item.s.r === 0 && item.e.r === 0 && item.s.c <= column && item.e.c >= column);
+          const groupCellColumn = merge ? merge.s.c : column;
+          const group = workbookCellText(sheet, 0, groupCellColumn) || 'Other Details';
+          const field = workbookCellText(sheet, 1, column) || workbookCellText(sheet, 0, column) || `Column ${column + 1}`;
+          let key = `${adminColumnSlug(group)}__${adminColumnSlug(field)}`;
+          let suffix = 2;
+          while (usedKeys.has(key)) key = `${adminColumnSlug(group)}__${adminColumnSlug(field)}_${suffix++}`;
+          usedKeys.add(key);
+          columns.push({ key, group, label: field, sourceColumn: XLSX.utils.encode_col(column) });
+        }
+
+        const serialColumn = columns.findIndex(column => /sl\s*no/i.test(column.label));
+        const records = [];
+        const usedIds = new Set();
+        for (let row = 2; row <= range.e.r; row++) {
+          const values = columns.map((_, idx) => workbookCellText(sheet, row, range.s.c + idx));
+          if (!values.some(value => value)) continue;
+          const sourceRow = row + 1;
+          const serial = serialColumn >= 0 ? values[serialColumn] : '';
+          const validSerial = serial && !/^(no data|not found|not applicable|n\/a|na|-)$/i.test(serial);
+          let recordId = validSerial ? `ROW-${adminColumnSlug(serial).toUpperCase()}` : `ROW-EXCEL-${sourceRow}`;
+          let duplicate = 2;
+          while (usedIds.has(recordId)) recordId = `${recordId}-${duplicate++}`;
+          usedIds.add(recordId);
+          const record = { recordId, sourceRow };
+          columns.forEach((column, index) => { record[column.key] = values[index]; });
+          records.push(record);
+        }
+        if (!records.length) throw new Error('No customer/asset rows were found under the header.');
+        pendingAdminAssetImport = { columns, records, sheetName };
+        button.disabled = false;
+        summary.textContent = `Ready to import ${records.length} rows, ${columns.length} columns from “${sheetName}”. Customer values remain in memory until you choose Import.`;
+      } catch (error) {
+        summary.textContent = `Could not read workbook: ${error.message}`;
+      }
+    }
+
+    async function importAdminAssetWorkbook() {
+      if (!pendingAdminAssetImport || currentUser?.role !== 'admin') return;
+      const { columns, records } = pendingAdminAssetImport;
+      if (!confirm(`Replace the existing admin asset master with ${records.length} rows from this workbook? The public app page will not contain the data.`)) return;
+      const button = document.getElementById('adminAssetImportButton');
+      const status = document.getElementById('adminAssetMasterStatus');
+      button.disabled = true;
+      status.textContent = 'Sending workbook to the protected admin database…';
+      try {
+        const result = await adminAssetApi('syncAdminAssetMaster', { columns, records });
+        status.textContent = `${result.recordsImported} records imported to the admin-only database.`;
+        pendingAdminAssetImport = null;
+        document.getElementById('adminAssetWorkbookInput').value = '';
+        document.getElementById('adminAssetImportSummary').textContent = '';
+        await loadAdminAssetMaster();
+      } catch (error) {
+        status.textContent = error.message;
+        button.disabled = false;
+      }
+    }
+
+    function adminField(record, pattern) {
+      const column = adminAssetColumns.find(item => item.key.endsWith(`__${pattern}`));
+      return column ? String(record[column.key] || '').trim() : '';
+    }
+
+    function renderAdminAssetMasterList() {
+      const list = document.getElementById('adminAssetMasterList');
+      if (!list) return;
+      list.replaceChildren();
+      document.getElementById('adminAssetRecordCount').textContent = adminAssetRecords.length;
+      const query = (document.getElementById('adminAssetSearch')?.value || '').trim().toLowerCase();
+      const filtered = adminAssetRecords.filter(record => {
+        if (!query) return true;
+        return adminAssetColumns.some(column => String(record[column.key] || '').toLowerCase().includes(query));
+      });
+      if (!adminAssetRecords.length) {
+        const empty = document.createElement('p');
+        empty.className = 'col-span-full text-center text-slate-400 p-6';
+        empty.textContent = currentUser?.role === 'admin' ? 'No detailed records are loaded. Import the Excel master above.' : 'Admin access required.';
+        list.appendChild(empty);
+        return;
+      }
+      if (!filtered.length) {
+        const empty = document.createElement('p'); empty.className = 'col-span-full text-center text-slate-400 p-6'; empty.textContent = 'No matching records.'; list.appendChild(empty); return;
+      }
+      filtered.forEach(record => {
+        const card = document.createElement('article');
+        card.className = 'rounded-xl border border-slate-700 bg-slate-900/80 p-3 space-y-2';
+        const title = document.createElement('h4'); title.className = 'font-bold text-white';
+        title.textContent = adminField(record, 'name_of_the_customer') || `Asset record ${record.recordId}`;
+        const summary = document.createElement('p'); summary.className = 'text-slate-400';
+        summary.textContent = `Customer ID: ${adminField(record, 'customer_id') || 'Not available'} · ${adminField(record, 'location') || 'Location not available'}`;
+        const equipment = document.createElement('p'); equipment.className = 'text-slate-300';
+        equipment.textContent = `Status: ${adminField(record, 'status_running_td_pd') || 'Not specified'} · DRS: ${adminField(record, 'drs_name') || '—'} · MDPE Valve: ${adminField(record, 'mdpe_valve_no') || '—'}`;
+        const action = document.createElement('button'); action.type = 'button';
+        action.className = 'px-3 py-1.5 rounded-lg bg-teal-700 text-white font-semibold'; action.textContent = 'View Full Details & History';
+        action.addEventListener('click', () => openAdminAssetDetails(record.recordId));
+        card.append(title, summary, equipment, action);
+        list.appendChild(card);
+      });
+    }
+
+    function openAdminAssetDetails(recordId) {
+      if (currentUser?.role !== 'admin') return showToast('Admin access required.');
+      selectedAdminAssetRecord = adminAssetRecords.find(record => record.recordId === recordId);
+      if (!selectedAdminAssetRecord) return showToast('Asset record not found. Refresh the admin database.');
+      const record = selectedAdminAssetRecord;
+      document.getElementById('adminAssetDetailTitle').textContent = adminField(record, 'name_of_the_customer') || `Asset record ${record.recordId}`;
+      document.getElementById('adminAssetDetailSubtitle').textContent = `Customer ID: ${adminField(record, 'customer_id') || 'Not available'} · Record ${record.recordId}`;
+      const groups = document.getElementById('adminAssetDetailGroups');
+      groups.replaceChildren();
+      const byGroup = new Map();
+      adminAssetColumns.forEach(column => {
+        const value = String(record[column.key] || '').trim();
+        if (!value) return;
+        if (!byGroup.has(column.group)) byGroup.set(column.group, []);
+        byGroup.get(column.group).push({ label: column.label, value });
+      });
+      byGroup.forEach((fields, groupName) => {
+        const section = document.createElement('section'); section.className = 'rounded-xl border border-slate-700 bg-slate-900/80 p-3';
+        const heading = document.createElement('h4'); heading.className = 'font-bold text-teal-300 border-b border-slate-700 pb-2 mb-2'; heading.textContent = groupName;
+        const body = document.createElement('dl'); body.className = 'grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2';
+        fields.forEach(field => {
+          const item = document.createElement('div'); item.className = 'min-w-0';
+          const dt = document.createElement('dt'); dt.className = 'text-slate-500'; dt.textContent = field.label;
+          const dd = document.createElement('dd'); dd.className = 'text-slate-200 break-words'; dd.textContent = field.value;
+          item.append(dt, dd); body.appendChild(item);
+        });
+        section.append(heading, body); groups.appendChild(section);
+      });
+      const date = document.getElementById('adminActivityDate');
+      if (date && !date.value) date.value = localDateKey();
+      renderAdminAssetActivityHistory(record);
+      openModal('adminAssetDetailModal');
+    }
+
+    function renderAdminAssetActivityHistory(record) {
+      const container = document.getElementById('adminAssetActivityList');
+      container.replaceChildren();
+      const activityRows = adminAssetActivities.filter(item => String(item.recordId) === String(record.recordId)).map(item => ({
+        date: item.activityDate, type: item.activityType, component: item.component,
+        previousValue: item.previousValue, newValue: item.newValue, tech: item.performedBy, remarks: item.remarks
+      }));
+      const linkedIds = new Set();
+      adminAssetColumns.filter(column => /customer_id|meter_no|serial_no|sr_no|valve_no|mjc_no/i.test(column.key)).forEach(column => {
+        const value = String(record[column.key] || '').trim();
+        if (value && !/^(no data|not found|not applicable|n\/a|na|-)$/i.test(value)) linkedIds.add(sanitizeKey(value));
+      });
+      maintenanceHistory.filter(log => linkedIds.has(sanitizeKey(log.assetId))).forEach(log => activityRows.push({
+        date: log.date, type: 'Maintenance', component: log.assetId, tech: log.tech,
+        remarks: [log.observations, log.remarks].filter(Boolean).join(' · '), beforePhoto: log.beforePhoto, afterPhoto: log.afterPhoto
+      }));
+      activityRows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+      if (!activityRows.length) {
+        const empty = document.createElement('p'); empty.className = 'text-slate-500 p-3'; empty.textContent = 'No activity records yet.'; container.appendChild(empty); return;
+      }
+      activityRows.forEach(item => {
+        const card = document.createElement('article'); card.className = 'rounded-lg border border-slate-800 bg-slate-900/70 p-3';
+        const title = document.createElement('div'); title.className = 'flex flex-wrap justify-between gap-2 font-semibold text-white';
+        const kind = document.createElement('span'); kind.textContent = [item.type, item.component].filter(Boolean).join(' · ');
+        const date = document.createElement('span'); date.className = 'text-teal-300'; date.textContent = formatToDDMMYYYY(item.date);
+        title.append(kind, date); card.appendChild(title);
+        if (item.tech) { const who = document.createElement('p'); who.className = 'text-slate-400 mt-1'; who.textContent = `By: ${item.tech}`; card.appendChild(who); }
+        if (item.previousValue || item.newValue) { const change = document.createElement('p'); change.className = 'text-slate-300 mt-1'; change.textContent = `${item.previousValue || '—'} → ${item.newValue || '—'}`; card.appendChild(change); }
+        if (item.remarks) { const remarks = document.createElement('p'); remarks.className = 'text-slate-300 mt-1'; remarks.textContent = item.remarks; card.appendChild(remarks); }
+        if (item.beforePhoto) appendPhotoPreviewButton(card, item.beforePhoto, 'Before Photo · ' + item.component, 'View Before');
+        if (item.afterPhoto) appendPhotoPreviewButton(card, item.afterPhoto, 'After Photo · ' + item.component, 'View After');
+        container.appendChild(card);
+      });
+    }
+
+    async function submitAdminAssetActivity(event) {
+      event.preventDefault();
+      if (!selectedAdminAssetRecord || currentUser?.role !== 'admin') return;
+      const form = document.getElementById('adminAssetActivityForm');
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      try {
+        await adminAssetApi('addAdminAssetActivity', {
+          recordId: selectedAdminAssetRecord.recordId,
+          activityType: document.getElementById('adminActivityType').value,
+          activityDate: document.getElementById('adminActivityDate').value,
+          component: document.getElementById('adminActivityComponent').value,
+          previousValue: document.getElementById('adminActivityPreviousValue').value,
+          newValue: document.getElementById('adminActivityNewValue').value,
+          remarks: document.getElementById('adminActivityRemarks').value
+        });
+        form.reset();
+        document.getElementById('adminActivityDate').value = localDateKey();
+        const result = await adminAssetApi('getAdminAssetMaster');
+        adminAssetActivities = Array.isArray(result.activities) ? result.activities : [];
+        renderAdminAssetActivityHistory(selectedAdminAssetRecord);
+        showToast('Activity added to asset history.');
+      } catch (error) { showToast(error.message); }
+      finally { button.disabled = false; }
+    }
+
     // --- TIMELINE & PROGRESS ---
     function openAssetHistory(assetId) {
       document.getElementById('historyAssetHeader').textContent = `Asset: ${assetId}`;
@@ -3397,7 +3741,33 @@ async function openLptReport(no){try{setLptStatus('Loading submitted report…')
       'Type *': { te: 'రకం *', hi: 'प्रकार *' },
       'Upload custom PNG icons to display on the GIS map for each category': { te: 'ప్రతి కేటగిరీకి GIS మ్యాప్‌లో చూపించడానికి కస్టమ్ PNG ఐకాన్లు అప్‌లోడ్ చేయండి', hi: 'हर श्रेणी के लिए GIS मैप पर दिखाने हेतु कस्टम PNG आइकन अपलोड करें' },
       'Valve Opening (Auto)': { te: 'వాల్వ్ ఓపెనింగ్ (ఆటో)', hi: 'वाल्व खुलना (ऑटो)' },
-      'Verified By': { te: 'ధృవీకరించినవారు', hi: 'सत्यापित करने वाला' }
+      'Verified By': { te: 'ధృవీకరించినవారు', hi: 'सत्यापित करने वाला' },
+      'Asset Data': { te: 'ఆస్తి డేటా', hi: 'एसेट डेटा' },
+      'Admin Asset Database': { te: 'అడ్మిన్ ఆస్తి డేటాబేస్', hi: 'एडमिन एसेट डेटाबेस' },
+      'Admin-only customer and equipment database': { te: 'అడ్మిన్‌లకు మాత్రమే కస్టమర్ మరియు పరికరాల డేటాబేస్', hi: 'केवल एडमिन के लिए ग्राहक और उपकरण डेटाबेस' },
+      'Customer and equipment details are available to admins only.': { te: 'కస్టమర్ మరియు పరికరాల వివరాలు అడ్మిన్‌లకు మాత్రమే అందుబాటులో ఉంటాయి.', hi: 'ग्राहक और उपकरण विवरण केवल एडमिन देख सकते हैं।' },
+      'Import or update the Excel master': { te: 'Excel మాస్టర్‌ను దిగుమతి చేయండి లేదా అప్‌డేట్ చేయండి', hi: 'Excel मास्टर आयात या अपडेट करें' },
+      'Search customer, ID, meter, DRS or valve...': { te: 'కస్టమర్, ఐడి, మీటర్, DRS లేదా వాల్వ్ కోసం వెతకండి...', hi: 'ग्राहक, आईडी, मीटर, DRS या वाल्व खोजें...' },
+      'View Full Details & History': { te: 'పూర్తి వివరాలు & చరిత్ర చూడండి', hi: 'पूरा विवरण और इतिहास देखें' },
+      'Complete Activity History': { te: 'పూర్తి కార్యకలాపాల చరిత్ర', hi: 'पूरी गतिविधि का इतिहास' },
+      'Select activity': { te: 'కార్యకలాపాన్ని ఎంచుకోండి', hi: 'गतिविधि चुनें' },
+      'Component (optional)': { te: 'కాంపోనెంట్ (ఐచ్ఛికం)', hi: 'कंपोनेंट (वैकल्पिक)' },
+      'Previous value (optional)': { te: 'మునుపటి విలువ (ఐచ్ఛికం)', hi: 'पिछला मान (वैकल्पिक)' },
+      'New value (optional)': { te: 'కొత్త విలువ (ఐచ్ఛికం)', hi: 'नया मान (वैकल्पिक)' },
+      'Details / remarks': { te: 'వివరాలు / వ్యాఖ్యలు', hi: 'विवरण / टिप्पणियाँ' },
+      'Add Activity to History': { te: 'చరిత్రకు కార్యకలాపం జోడించండి', hi: 'इतिहास में गतिविधि जोड़ें' },
+      'Import Excel to Admin Database': { te: 'Excel‌ను అడ్మిన్ డేటాబేస్‌లోకి దిగుమతి చేయండి', hi: 'Excel को एडमिन डेटाबेस में आयात करें' },
+      'ROW': { te: 'వరుస', hi: 'पंक्ति' },
+      'Reconnection / Activation': { te: 'రీకనెక్షన్ / యాక్టివేషన్', hi: 'पुनः कनेक्शन / सक्रियण' },
+      'Temporary Disconnection (TD)': { te: 'తాత్కాలిక డిస్‌కనెక్షన్ (TD)', hi: 'अस्थायी डिस्कनेक्शन (TD)' },
+      'Permanent Disconnection (PD)': { te: 'శాశ్వత డిస్‌కనెక్షన్ (PD)', hi: 'स्थायी डिस्कनेक्शन (PD)' },
+      'Meter Change': { te: 'మీటర్ మార్పు', hi: 'मीटर बदलाव' },
+      'Regulator Change': { te: 'రెగ్యులేటర్ మార్పు', hi: 'रेगुलेटर बदलाव' },
+      'EVC Change': { te: 'EVC మార్పు', hi: 'EVC बदलाव' },
+      'CRV Change': { te: 'CRV మార్పు', hi: 'CRV बदलाव' },
+      'Gauge Change': { te: 'గేజ్ మార్పు', hi: 'गेज बदलाव' },
+      'Filter Change': { te: 'ఫిల్టర్ మార్పు', hi: 'फ़िल्टर बदलाव' },
+      'Skid Change': { te: 'స్కిడ్ మార్పు', hi: 'स्किड बदलाव' }
     };
     const languageNames = { en: 'English', te: 'తెలుగు', hi: 'हिन्दी' };
     const originalTextNodes = new WeakMap();
