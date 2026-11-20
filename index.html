@@ -2644,10 +2644,18 @@
       const status = document.getElementById('adminAssetEditStatus');
       button.disabled = true; status.textContent = 'Saving changes securely…';
       try {
-        await adminAssetApi('updateAdminAssetRecord', { datasetType: selectedAdminDataset, recordId: selectedAdminAssetRecord.recordId, updates });
-        const id = selectedAdminAssetRecord.recordId;
+        const result = await adminAssetApi('getAdminAssetMaster', { datasetType: selectedAdminDataset });
+        const latestRecords = Array.isArray(result.records) ? result.records : [];
+        const latestRecord = latestRecords.find(record => String(record.recordId) === String(selectedAdminAssetRecord.recordId));
+        if (!latestRecord) throw new Error('Record not found in the latest database. Refresh and try again.');
+        Object.assign(latestRecord, updates);
+        const latestColumns = Array.isArray(result.columns) ? result.columns : adminAssetColumns;
+        await adminAssetApi('syncAdminAssetMaster', { datasetType: selectedAdminDataset, columns: latestColumns, records: latestRecords });
+        adminAssetRecords = latestRecords; adminAssetColumns = latestColumns;
+        adminAssetActivities = Array.isArray(result.activities) ? result.activities : [];
+        const id = latestRecord.recordId;
         status.textContent = 'Changes saved.';
-        await loadAdminAssetMaster();
+        renderAdminAssetMasterList();
         openAdminAssetDetails(id);
         showToast('Customer / asset details updated.');
       } catch (error) { status.textContent = error.message; }
