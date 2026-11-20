@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Bhagyanagar Gas Limited - Asset Maintenance System</title>
+  <title>BGL O&M · Beta</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12,6 +12,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- JSZip -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- XLSX reader for admin-only local Excel import (records are sent only after explicit admin submit). -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -37,9 +39,20 @@
     .tap-copy:active { transform: scale(0.98); background-color: rgba(20, 184, 166, 0.15); }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Keep the work portal on a consistent dark, full-page background. */
+    body { background: #070d18; color: #e2e8f0; font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+    .glass-card { background: rgba(15, 23, 42, .97); backdrop-filter: blur(12px); border-color: rgba(148, 163, 184, .2); }
+    #appContainer, #loginSection { background-color: #070d18; }
+    #appContainer header { background: rgba(15, 23, 42, .97); border-color: #1e293b; }
+    #photoPreviewModal iframe { background: #070d18; }
+    .photo-preview-trigger { cursor: zoom-in; }
+    .photo-preview-trigger:hover { filter: brightness(.95); }
+    #photoPreviewModal iframe { background: #f3f6f3; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-teal-500 selection:text-white pb-12 sm:pb-6">
+  <div id="betaModeBanner" style="position:sticky;top:0;z-index:10000;background:#713f12;color:#fef3c7;border-bottom:1px solid #a16207;padding:7px 12px;text-align:center;font:600 12px/1.4 system-ui">BETA TEST · Changes are saved only in this browser and never sent to the live maintenance sheets. <button type="button" onclick="if(confirm('Clear this browser’s beta test data and restart?')){window.__clearBetaStorage();location.reload()}" style="margin-left:8px;border:1px solid #fbbf24;border-radius:6px;padding:2px 8px;background:#422006;color:#fef3c7;cursor:pointer">Reset beta data</button></div>
 
   <!-- Toast Notification -->
   <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] hidden px-4 py-2.5 rounded-xl shadow-2xl bg-teal-600 text-white font-medium text-xs sm:text-sm flex items-center gap-2 transition-all">
@@ -145,6 +158,9 @@
             <button onclick="openModal('reportsModal')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 flex items-center gap-1">
               <i class="fa-solid fa-file-invoice"></i> <span class="hidden md:inline">Reports</span>
             </button>
+          <button onclick="openAdminAssetMaster()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 flex items-center gap-1" title="Admin-only databases">
+              <i class="fa-solid fa-database"></i> <span class="hidden md:inline">Databases</span>
+            </button>
             <button onclick="openModal('importModal')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 flex items-center gap-1">
               <i class="fa-solid fa-file-import"></i>
             </button>
@@ -160,6 +176,17 @@
           <button onclick="openProgressModal()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 flex items-center gap-1">
             <i class="fa-solid fa-chart-line"></i> <span class="hidden sm:inline">Progress</span>
           </button>
+
+          <div id="languageSelector" class="relative">
+            <button id="languageButton" type="button" onclick="toggleLanguageMenu()" aria-haspopup="true" aria-expanded="false" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-globe"></i><span id="currentLanguageLabel">English</span><i class="fa-solid fa-chevron-down text-[9px]"></i>
+            </button>
+            <div id="languageMenu" class="hidden absolute right-0 top-full mt-1 min-w-36 z-[80] rounded-xl border border-slate-700 bg-slate-900 shadow-xl p-1.5">
+              <button type="button" onclick="setInterfaceLanguage('en')" class="w-full text-left px-3 py-2 rounded-lg text-xs text-white hover:bg-slate-800">English</button>
+              <button type="button" onclick="setInterfaceLanguage('te')" class="w-full text-left px-3 py-2 rounded-lg text-xs text-white hover:bg-slate-800">తెలుగు</button>
+              <button type="button" onclick="setInterfaceLanguage('hi')" class="w-full text-left px-3 py-2 rounded-lg text-xs text-white hover:bg-slate-800">हिन्दी</button>
+            </div>
+          </div>
 
           <button onclick="handleLogout()" title="Logout" class="p-1.5 sm:p-2 rounded-lg text-xs bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 transition">
             <i class="fa-solid fa-power-off"></i>
@@ -467,21 +494,30 @@
     </div>
   </div>
 
-  <!-- Technician Self-Service Password Modal -->
+  <!-- Technician Self-Service Password Modal (beta-local only) -->
   <div id="ownPasswordModal" class="hidden fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-3">
     <div class="glass-card w-full max-w-sm p-5 rounded-2xl border border-slate-700 text-xs">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-        <div><h3 class="text-sm font-bold text-white"><i class="fa-solid fa-key text-amber-400 mr-1"></i> Change My Password</h3><p class="text-slate-400 mt-1">Update your staff account password</p></div>
+        <div>
+          <h3 class="text-sm font-bold text-white"><i class="fa-solid fa-key text-amber-400 mr-1"></i> Change My Password</h3>
+          <p class="text-slate-400 mt-1">For this beta browser only</p>
+        </div>
         <button type="button" onclick="closeModal('ownPasswordModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="ownPasswordForm" onsubmit="saveOwnPassword(event)" class="space-y-3">
-        <label class="block text-slate-400">Current password<input id="ownPasswordCurrent" type="password" autocomplete="current-password" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></label>
-        <label class="block text-slate-400">New password (at least 6 characters)<input id="ownPasswordNew" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></label>
-        <label class="block text-slate-400">Confirm new password<input id="ownPasswordConfirm" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white"></label>
+        <label class="block text-slate-400">Current password
+          <input id="ownPasswordCurrent" type="password" autocomplete="current-password" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
+        </label>
+        <label class="block text-slate-400">New password (at least 6 characters)
+          <input id="ownPasswordNew" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
+        </label>
+        <label class="block text-slate-400">Confirm new password
+          <input id="ownPasswordConfirm" type="password" autocomplete="new-password" minlength="6" required class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded text-white">
+        </label>
         <p id="ownPasswordError" class="hidden text-rose-300"></p>
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
           <button type="button" onclick="closeModal('ownPasswordModal')" class="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded">Cancel</button>
-          <button id="ownPasswordSaveButton" type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Password</button>
+          <button type="submit" class="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded">Save Password</button>
         </div>
       </form>
     </div>
@@ -678,7 +714,7 @@
         <div class="flex items-center justify-end gap-2 pt-2">
           <button type="button" onclick="closeModal('maintenanceModal')" class="px-3.5 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Cancel</button>
           <button type="submit" id="submitMaintBtn" class="px-4 py-2 bg-teal-600 text-white font-medium rounded hover:bg-teal-500 flex items-center gap-1.5">
-            <i class="fa-solid fa-check"></i> Close & Sync to Drive
+            <i class="fa-solid fa-check"></i> Submit Maintenance
           </button>
         </div>
       </form>
@@ -698,6 +734,77 @@
         <button onclick="closeModal('assetHistoryModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark fa-lg"></i></button>
       </div>
       <div id="historyTimelineContainer" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- Admin-only detailed customer / equipment master. Source data is never embedded in this page. -->
+  <div id="adminAssetMasterModal" class="hidden fixed inset-0 z-[55] bg-black/85 flex items-center justify-center p-2 sm:p-4">
+    <div class="glass-card w-full max-w-6xl p-4 sm:p-5 rounded-2xl max-h-[95vh] overflow-y-auto border border-slate-700 text-xs">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-3 mb-3">
+        <div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-database text-emerald-400 mr-1"></i> Admin Databases</h3><p class="text-slate-400 mt-1">Choose a database first. Each Excel import is kept separate and is visible to admins only.</p></div>
+        <button onclick="closeAdminAssetMaster()" class="text-slate-400 hover:text-white p-1" aria-label="Close admin asset database"><i class="fa-solid fa-xmark fa-lg"></i></button>
+      </div>
+      <div class="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3 mb-3 space-y-2">
+        <div class="font-semibold text-emerald-300">Choose where this Excel file belongs</div>
+        <p class="text-slate-400">Only the selected database will be replaced. The other databases and the app maintenance logs remain unchanged.</p>
+        <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <label class="sr-only" for="adminAssetDatasetSelect">Target database</label>
+          <select id="adminAssetDatasetSelect" onchange="changeAdminDataset()" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+            <option value="assets">Asset / Customer Master</option>
+            <option value="maintenance">Maintenance Excel Database</option>
+            <option value="ipng_cpng">IPNG / CPNG Database</option>
+          </select>
+          <input id="adminAssetWorkbookInput" type="file" accept=".xlsx,.xls" onchange="previewAdminAssetWorkbook(this)" class="block w-full text-xs text-slate-300 file:mr-2 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white">
+          <button id="adminAssetImportButton" type="button" disabled onclick="importAdminAssetWorkbook()" class="px-3 py-2 rounded-lg bg-emerald-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">Import to Selected Database</button>
+        </div>
+        <p id="adminAssetImportSummary" class="text-slate-300"></p>
+        <p id="adminAssetMasterStatus" class="text-amber-300"></p>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2 sm:items-center justify-between mb-3">
+        <div class="text-slate-300"><b id="adminAssetRecordCount">0</b> records</div>
+        <input id="adminAssetSearch" oninput="renderAdminAssetMasterList()" placeholder="Search customer, ID, meter, DRS or valve..." class="w-full sm:max-w-md p-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+      </div>
+      <div id="adminAssetMasterList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5"></div>
+    </div>
+  </div>
+
+  <div id="adminAssetDetailModal" class="hidden fixed inset-0 z-[65] bg-black/85 flex items-center justify-center p-2 sm:p-4">
+    <div class="glass-card w-full max-w-5xl p-4 sm:p-5 rounded-2xl max-h-[95vh] overflow-y-auto border border-slate-700 text-xs">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-3 mb-3">
+        <div class="min-w-0"><h3 id="adminAssetDetailTitle" class="text-base font-bold text-white truncate">Asset Details</h3><p id="adminAssetDetailSubtitle" class="text-slate-400 mt-1"></p></div>
+        <button onclick="closeModal('adminAssetDetailModal')" class="text-slate-400 hover:text-white p-1" aria-label="Close asset details"><i class="fa-solid fa-xmark fa-lg"></i></button>
+      </div>
+      <div id="adminAssetDetailGroups" class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4"></div>
+      <section class="border-t border-slate-800 pt-3">
+        <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-clock-rotate-left text-teal-300 mr-1"></i> Complete Activity History</h4>
+        <form id="adminAssetActivityForm" onsubmit="submitAdminAssetActivity(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 mb-3">
+          <select id="adminActivityType" required class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+            <option value="">Select activity</option><option>Maintenance</option><option>Temporary Disconnection (TD)</option><option>Permanent Disconnection (PD)</option><option>Reconnection / Activation</option><option>Meter Change</option><option>Regulator Change</option><option>EVC Change</option><option>CRV Change</option><option>Gauge Change</option><option>Filter Change</option><option>Skid Change</option><option>Other</option>
+          </select>
+          <input id="adminActivityDate" type="date" required class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityComponent" placeholder="Component (optional)" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityPreviousValue" placeholder="Previous value (optional)" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityNewValue" placeholder="New value (optional)" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <input id="adminActivityRemarks" placeholder="Details / remarks" class="p-2 bg-slate-950 border border-slate-700 rounded-lg text-white lg:col-span-2">
+          <button type="submit" class="px-3 py-2 rounded-lg bg-teal-700 text-white font-semibold lg:col-span-6"><i class="fa-solid fa-plus mr-1"></i> Add Activity to History</button>
+        </form>
+        <div id="adminAssetActivityList" class="space-y-2"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- In-page photo viewer: keeps technicians inside the maintenance page. -->
+  <div id="photoPreviewModal" class="hidden fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-3 sm:p-6" onclick="if(event.target===this)closePhotoPreview()">
+    <div class="glass-card w-full max-w-5xl rounded-2xl overflow-hidden flex flex-col max-h-[94vh]">
+      <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200">
+        <div class="min-w-0"><h3 id="photoPreviewTitle" class="font-bold text-slate-900 truncate">Maintenance Photo</h3><p class="text-xs text-slate-500">Photo preview</p></div>
+        <button type="button" onclick="closePhotoPreview()" aria-label="Close photo preview" class="shrink-0 w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex-1 min-h-0 bg-slate-100 flex items-center justify-center p-2 sm:p-4 overflow-auto">
+        <img id="photoPreviewImage" class="hidden max-w-full max-h-[78vh] object-contain rounded-lg" alt="Maintenance photo preview">
+        <iframe id="photoPreviewFrame" class="hidden w-full h-[78vh] rounded-lg border-0" title="Google Drive photo preview" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay"></iframe>
+        <p id="photoPreviewError" class="hidden text-sm text-slate-600 text-center p-8">This photo cannot be previewed here. Check that the Drive file is shared with your account.</p>
+      </div>
     </div>
   </div>
 
@@ -915,6 +1022,145 @@
 
   <!-- ==================== JAVASCRIPT LOGIC ==================== -->
   <script>
+  // Beta-only storage/API adapter. Production page and production APIs remain untouched.
+  (() => {
+    const PREFIX = 'bgl_beta_v1:';
+    const rawLocal = window.localStorage;
+    const rawSession = window.sessionStorage;
+    function scopedStorage(raw) {
+      return {
+        getItem(key) { return raw.getItem(PREFIX + key); },
+        setItem(key, value) { raw.setItem(PREFIX + key, String(value)); },
+        removeItem(key) { raw.removeItem(PREFIX + key); },
+        clear() { for (let i = raw.length - 1; i >= 0; i--) { const key = raw.key(i); if (key && key.startsWith(PREFIX)) raw.removeItem(key); } },
+        key(index) { const keys=[]; for(let i=0;i<raw.length;i++){const k=raw.key(i);if(k&&k.startsWith(PREFIX))keys.push(k.slice(PREFIX.length));} return keys[index] ?? null; },
+        get length() { let n=0; for(let i=0;i<raw.length;i++){const k=raw.key(i);if(k&&k.startsWith(PREFIX))n++;} return n; }
+      };
+    }
+    window.__betaStorage = scopedStorage(rawLocal);
+    window.__betaSessionStorage = scopedStorage(rawSession);
+    window.__clearBetaStorage = () => { window.__betaStorage.clear(); window.__betaSessionStorage.clear(); };
+
+    const CORE = 'https://script.google.com/macros/s/AKfycbylrzoqNj4M2kNaMpyVoB64VYulZYeNzTvNlhDS5NGVt_JVlM3Jrvxtcn94Nr0j52DbMg/exec';
+    const LPT = 'https://script.google.com/macros/s/AKfycbwpOIJubJS0Sq0sEY74hmS3P-Amh9RRisEDoeD5bng0-Pq5G39qbFDJqin2_zLEhY6UUg/exec';
+    const nativeFetch = window.fetch.bind(window);
+    const STATE_KEY = 'api_state';
+    const LPT_KEY = 'lpt_state';
+    const read = key => { try { return JSON.parse(window.__betaStorage.getItem(key) || 'null'); } catch (_) { return null; } };
+    const write = (key, value) => window.__betaStorage.setItem(key, JSON.stringify(value));
+    const coreState = () => read(STATE_KEY) || { initialized:false, assets:[], logs:[], notices:[], icons:[], iconsInitialized:true, users:[], passwordOverrides:{}, liveUsers:[], liveUserIds:[] };
+    const lptState = () => read(LPT_KEY) || { drafts:[], reports:[], photos:[], nextNo:1 };
+    const jsonResponse = obj => new Response(JSON.stringify(obj), {status:200, headers:{'Content-Type':'application/json'}});
+    const normalizedUrl = input => { try { return new URL(typeof input === 'string' ? input : input.url); } catch (_) { return null; } };
+
+    async function handleCore(url, init) {
+      const method = String(init?.method || (typeof input !== 'undefined' && input?.method) || 'GET').toUpperCase();
+      const state = coreState();
+      state.users = Array.isArray(state.users) ? state.users : [];
+      state.passwordOverrides = state.passwordOverrides || {};
+      state.liveUserIds = state.liveUserIds || [];
+      if (method !== 'GET') {
+        let body={}; try { body=JSON.parse(init?.body || '{}'); } catch (_) {}
+        let result={status:'success', message:'Saved in beta browser only'};
+        if (body.action === 'authenticate') {
+          const id=String(body.id||'').trim().toUpperCase();
+          const local=state.users.find(u=>String(u.id||'').trim().toUpperCase()===id);
+          const override=state.passwordOverrides?.[id];
+          if(local && String(override||local.pass||'')===String(body.password||'')) return jsonResponse({status:'success',user:{id:local.id,name:local.name,team:local.team||'',role:local.role||'tech'}});
+          if(Object.prototype.hasOwnProperty.call(state.passwordOverrides||{},id)) return jsonResponse({status:'error',message:'Invalid user ID or password'});
+          return nativeFetch(url.href,init);
+        }
+        else if (body.action === 'changeOwnPassword') {
+          const id=String(body.id||'').trim().toUpperCase();
+          const current=String(body.currentPassword||'');
+          const next=String(body.newPassword||'');
+          if(next.trim().length<6) return jsonResponse({status:'error',message:'Use at least 6 characters for the new password'});
+          const local=state.users.find(u=>String(u.id||'').trim().toUpperCase()===id);
+          let verified=false;
+          if(local) verified=String(state.passwordOverrides?.[id]||local.pass||'')===current;
+          else if(!Object.prototype.hasOwnProperty.call(state.passwordOverrides||{},id)) {
+            try { const check=await nativeFetch(url.href,{method:'POST',headers:init.headers,body:JSON.stringify({action:'authenticate',id:body.id,password:current})}); const auth=await check.clone().json(); verified=auth.status==='success'; } catch(_) {}
+          } else verified=String(state.passwordOverrides[id])===current;
+          if(!verified) return jsonResponse({status:'error',message:'Current password is incorrect'});
+          state.passwordOverrides[id]=next;
+          write(STATE_KEY,state);
+          return jsonResponse({status:'success',message:'Password saved in this beta browser only'});
+        }
+        else if (body.action === 'syncAssets') state.assets = Array.isArray(body.assets) ? body.assets : [];
+        else if (body.action === 'addUser') {
+          const id=String(body.id||'').trim().toUpperCase();
+          if (!id || [...state.users].some(u=>String(u.id||'').trim().toUpperCase()===id) || (state.liveUserIds||[]).includes(id)) result={status:'error',message:'A beta account with this ID already exists'};
+          else { state.users.push({id,name:body.name||'',pass:body.pass||'',team:body.team||'',role:body.role||'tech'}); state.passwordOverrides[id]=body.pass||''; }
+        } else if (body.action === 'logMaintenance') {
+          const log={id:'BETA-LOG-'+Date.now(),assetId:body.assetId,tech:body.tech,date:body.date,observations:body.observations||'',remarks:body.remarks||'',beforePhotoUrl:body.beforePhoto||'',afterPhotoUrl:body.afterPhoto||'',timestamp:new Date().toISOString()};
+          state.logs.push(log); result={status:'success',id:log.id,beforeUrl:log.beforePhotoUrl,afterUrl:log.afterPhotoUrl,message:'Saved in beta browser only'};
+        } else if (body.action === 'sendNotice') {
+          state.notices.push({id:'BETA-NOTICE-'+Date.now(),targetTechId:body.targetTechId||'*',targetTechName:body.targetTechName||'',message:body.message||'',sender:body.sender||'',active:true,timestamp:new Date().toISOString()});
+        } else if (body.action === 'clearNotices') state.notices=[];
+        else if (body.action === 'syncIcon') { state.icons=(state.icons||[]).filter(i=>i.category!==body.category);state.icons.push({category:body.category,dataUri:body.dataUri});state.iconsInitialized=true; }
+        else if (body.action === 'syncIcons') { state.icons=Array.isArray(body.icons)?body.icons:[];state.iconsInitialized=true; }
+        else if (body.action === 'deleteIcon') state.icons=(state.icons||[]).filter(i=>i.category!==body.category);
+        else if (body.action === 'clearIcons') { state.icons=[];state.iconsInitialized=true; }
+        else return jsonResponse({status:'error',message:`Unsupported beta action: ${body.action||'unknown'}`});
+        write(STATE_KEY,state); return jsonResponse(result);
+      }
+      const action=url.searchParams.get('action')||'getData';
+      if (action==='getData') {
+        const response=await nativeFetch(url.href,{method:'GET'});
+        const remote=await response.clone().json();
+        if (!state.initialized && remote.status==='success') {
+          state={...state,initialized:true,assets:Array.isArray(remote.assets)?remote.assets:[],logs:Array.isArray(remote.logs)?remote.logs:[],notices:Array.isArray(remote.notices)?remote.notices:[],icons:Array.isArray(remote.icons)?remote.icons:[],iconsInitialized:remote.iconsInitialized!==false,users:[],passwordOverrides:state.passwordOverrides||{},liveUsers:(remote.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})),liveUserIds:(remote.users||[]).map(u=>String(u.id||'').trim().toUpperCase())};
+          write(STATE_KEY,state);
+        }
+        if (remote.status==='success') { const publicUsers=(remote.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); const betaUsers=(state.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); return jsonResponse({...remote,assets:state.assets,logs:state.logs,notices:state.notices,icons:state.icons,iconsInitialized:state.iconsInitialized,users:[...publicUsers,...betaUsers]}); }
+        return response;
+      }
+      if (action==='getNotices') return jsonResponse({status:'success',notices:state.notices});
+      if (action==='getIcons') return jsonResponse({status:'success',icons:state.icons,iconsInitialized:state.iconsInitialized});
+      return jsonResponse({status:'error',message:`Unsupported beta read: ${action}`});
+    }
+
+    function lptSummary(data) { return {draftId:data.draftId,reportNo:data.reportNo||'',location:data.location||data.testLocation||'',sectionDetails:data.sectionDetails||data.feeder||'',date:data.date||'',updatedAt:new Date().toLocaleString()}; }
+    async function handleLpt(url, init) {
+      const state=lptState(); const method=String(init?.method||'GET').toUpperCase();
+      if(method==='GET'){
+        const action=url.searchParams.get('action')||'';
+        if(action==='getNextReportNo') return jsonResponse({success:true,reportNo:`BETA-LPT-${String(state.nextNo).padStart(4,'0')}`});
+        if(action==='getDraftList') return jsonResponse({success:true,drafts:state.drafts.map(x=>lptSummary(x.data))});
+        if(action==='listReports') return jsonResponse({success:true,reports:state.reports.map(x=>({reportNo:x.reportNo,location:x.location||x.testLocation||'',date:x.date||'',feeder:x.feeder||'',sectionDetails:x.sectionDetails||'',pdfUrl:''}))});
+        if(action==='loadDraft'){const row=state.drafts.find(x=>x.draftId===url.searchParams.get('draftId'));return jsonResponse(row?{success:true,data:row}:{success:false,message:'Beta draft not found'});}
+        if(action==='loadReport'){const row=state.reports.find(x=>String(x.reportNo)===url.searchParams.get('reportNo'));return jsonResponse(row?{success:true,data:row}:{success:false,message:'Beta report not found'});}
+        return jsonResponse({success:true,drafts:[],reports:[]});
+      }
+      let body={};try{body=JSON.parse(init?.body||'{}');}catch(_){}
+      let result={success:true};
+      if(body.action==='uploadPhoto'){
+        const photo={fileName:`BETA_${body.originalName||'photo'}`,webViewLink:'',photoData:body.dataUrl||'',readingNo:body.readingNo};
+        state.photos.push(photo);result=photo;
+      } else if(body.action==='saveDraft'){
+        const data={...(body.data||{})};if(!data.reportNo)data.reportNo=`BETA-LPT-${String(state.nextNo).padStart(4,'0')}`;
+        const index=state.drafts.findIndex(x=>x.draftId===data.draftId);if(index>=0)state.drafts[index]=data;else state.drafts.push(data);
+        result={success:true,draftId:data.draftId,reportNo:data.reportNo};
+      } else if(body.action==='submitReport'){
+        const data={...(body.data||{})};if(!data.reportNo)data.reportNo=`BETA-LPT-${String(state.nextNo).padStart(4,'0')}`;
+        const index=state.reports.findIndex(x=>String(x.reportNo)===String(data.reportNo));if(index>=0)state.reports[index]=data;else{state.reports.push(data);state.nextNo++;}
+        state.drafts=state.drafts.filter(x=>x.draftId!==data.draftId);result={success:true,reportNo:data.reportNo,pdfUrl:''};
+      } else if(body.action==='clearDrafts'){const n=state.drafts.length;state.drafts=[];result={success:true,cleared:n};}
+      else return jsonResponse({success:false,message:`Unsupported beta LPT action: ${body.action||'unknown'}`});
+      write(LPT_KEY,state);return jsonResponse(result);
+    }
+
+    window.fetch = function(input, init) {
+      const url=normalizedUrl(input);
+      if(url && url.href.startsWith(CORE)) return handleCore(url,init||{});
+      if(url && url.href.startsWith(LPT)) return handleLpt(url,init||{});
+      return nativeFetch(input,init);
+    };
+  })();
+  </script>
+  <script>
+    const localStorage = window.__betaStorage;
+    const sessionStorage = window.__betaSessionStorage;
     const memStore = {};
     const safeStore = {
       get: (k) => { try { return localStorage.getItem(k); } catch(e) { return memStore[k] || null; } },
@@ -922,7 +1168,7 @@
       remove: (k) => { try { localStorage.removeItem(k); } catch(e) { delete memStore[k]; } }
     };
 
-    const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbylrzoqNj4M2kNaMpyVoB64VYulZYeNzTvNlhDS5NGVt_JVlM3Jrvxtcn94Nr0j52DbMg/exec";
+    const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyeWkgqGAUjRwIH_YdmJC5ryNYcjR3K_n-uuuWHCX9_12aniF18SEWD-KEC5D9cxz6M/exec";
 
 
     const CATEGORIES = ['SR', 'DRS', 'MRS', 'Diaphragm meter', 'MDPE Valve', 'SV station'];
@@ -967,6 +1213,13 @@
     let cloudTechnicians = [];
     let customIcons = {};
     let currentUser = null;
+    let adminSessionToken = sessionStorage.getItem('bgl_admin_session') || '';
+    let adminAssetColumns = [];
+    let adminAssetRecords = [];
+    let adminAssetActivities = [];
+    let pendingAdminAssetImport = null;
+    let selectedAdminAssetRecord = null;
+    let selectedAdminDataset = 'assets';
     let assets = [];
     let maintenanceHistory = [];
     let cloudNotices = [];
@@ -1070,40 +1323,26 @@
 
     // --- INSTANT BULLETPROOF AUTHENTICATION ---
     async function executeLogin() {
-      const id = (document.getElementById('loginUsername').value || '').trim().toUpperCase();
-      const password = document.getElementById('loginPassword').value || '';
-      const error = document.getElementById('loginError');
-      if (!id || !password) { error.textContent = 'Please enter both User ID and Password'; error.classList.remove('hidden'); return; }
-      const button = document.querySelector('#loginSection button[onclick="executeLogin()"]');
-      if (button) { button.disabled = true; button.dataset.originalText = button.innerHTML; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking sign-in…'; }
-      try {
-        const response = await fetch(CLOUD_API_URL, {
-          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'authenticate', id, password })
-        });
-        const result = await response.json();
-        if (!response.ok || result.status !== 'success' || !result.user) {
-          error.textContent = result.message || 'Invalid User ID or Password.';
-          error.classList.remove('hidden');
-          return;
-        }
-        currentUser = { ...result.user, role: String(result.user.role || 'tech').toLowerCase() };
-        localStorage.setItem('bgl_auth_user', JSON.stringify({ id:currentUser.id, name:currentUser.name, role:currentUser.role, team:currentUser.team }));
-        sessionStorage.removeItem('bgl_auth_user');
-        error.classList.add('hidden');
-        document.getElementById('loginSection').style.setProperty('display', 'none', 'important');
-        const appCon = document.getElementById('appContainer');
-        appCon.style.setProperty('display', 'flex', 'important');
-        appCon.classList.remove('hidden');
-        initAppView();
-        restoreMaintenanceDraftOnStartup();
-        showToast(`Welcome, ${currentUser.name}!`);
-      } catch (err) {
-        error.textContent = 'Could not check sign-in. Ask the administrator to update the Apps Script, then try again.';
-        error.classList.remove('hidden');
-      } finally {
-        if (button) { button.disabled = false; button.innerHTML = button.dataset.originalText || 'Sign In'; }
-      }
+      const id=(document.getElementById('loginUsername').value||'').trim().toUpperCase();
+      const password=document.getElementById('loginPassword').value||'';
+      const error=document.getElementById('loginError');
+      if(!id||!password){error.textContent='Please enter both User ID and Password';error.classList.remove('hidden');return;}
+      const button=document.querySelector('#loginSection button[onclick="executeLogin()"]');
+      if(button){button.disabled=true;button.dataset.originalText=button.innerHTML;button.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Checking beta sign-in…';}
+      try{
+        const response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'authenticate',id,password})});
+        const result=await response.json();
+        if(!response.ok||result.status!=='success'||!result.user){error.textContent=result.message||'Invalid User ID or Password.';error.classList.remove('hidden');return;}
+        currentUser={...result.user,role:String(result.user.role||'tech').toLowerCase()};
+        adminSessionToken=String(result.sessionToken||'');
+        if(adminSessionToken) sessionStorage.setItem('bgl_admin_session',adminSessionToken); else sessionStorage.removeItem('bgl_admin_session');
+        localStorage.setItem('bgl_auth_user',JSON.stringify({id:currentUser.id,name:currentUser.name,role:currentUser.role,team:currentUser.team}));
+        sessionStorage.removeItem('bgl_auth_user');error.classList.add('hidden');
+        document.getElementById('loginSection').style.setProperty('display','none','important');
+        const appCon=document.getElementById('appContainer');appCon.style.setProperty('display','flex','important');appCon.classList.remove('hidden');
+        initAppView();restoreMaintenanceDraftOnStartup();showToast(`Welcome to beta, ${currentUser.name}!`);
+      }catch(err){error.textContent='Could not verify sign-in. The Apps Script authentication update must be deployed first.';error.classList.remove('hidden');}
+      finally{if(button){button.disabled=false;button.innerHTML=button.dataset.originalText||'Sign In';}}
     }
 
     function togglePassVisibility() {
@@ -1120,6 +1359,7 @@
 
     function checkSession() {
       try {
+        adminSessionToken = sessionStorage.getItem('bgl_admin_session') || '';
         const sess = localStorage.getItem('bgl_auth_user') || sessionStorage.getItem('bgl_auth_user');
         if (sess) {
           currentUser = JSON.parse(sess);
@@ -1137,7 +1377,15 @@
 
     function handleLogout() {
       persistMaintenanceDraftNow(true);
-      try { localStorage.removeItem('bgl_auth_user'); sessionStorage.removeItem('bgl_auth_user'); } catch(e) {}
+      try { localStorage.removeItem('bgl_auth_user'); sessionStorage.removeItem('bgl_auth_user'); sessionStorage.removeItem('bgl_admin_session'); } catch(e) {}
+      adminSessionToken = '';
+      adminAssetColumns = [];
+      adminAssetRecords = [];
+      adminAssetActivities = [];
+      pendingAdminAssetImport = null;
+      selectedAdminAssetRecord = null;
+      closeModal('adminAssetMasterModal');
+      closeModal('adminAssetDetailModal');
       currentUser = null;
       document.getElementById('appContainer').classList.add('hidden');
       document.getElementById('appContainer').style.setProperty('display', 'none', 'important');
@@ -1211,24 +1459,20 @@
 
     async function saveNewTeamMember(e) {
       e.preventDefault();
-      const id = document.getElementById('newUserId').value.trim().toUpperCase();
-      const name = document.getElementById('newUserName').value.trim();
-      const pass = document.getElementById('newUserPass').value.trim();
-      const role = document.getElementById('newUserRoleSelect').value;
-      const team = role === 'admin' ? 'ALL' : document.getElementById('newUserTeamSelect').value;
-      if (!id || !name || !pass || !role || !team) return showToast('Complete all staff account fields.');
+      const id=document.getElementById('newUserId').value.trim().toUpperCase();
+      const name=document.getElementById('newUserName').value.trim();
+      const pass=document.getElementById('newUserPass').value.trim();
+      const role=document.getElementById('newUserRoleSelect').value;
+      const team=role==='admin'?'ALL':document.getElementById('newUserTeamSelect').value;
+      if(!id||!name||!pass||!role||!team)return showToast('Complete all staff account fields.');
       try {
-        await postCloudAction({ action: 'addUser', id, name, pass, team, role });
-        ROSTER_MAP[sanitizeKey(id)] = { id, name, team, role };
-        cloudTechnicians = cloudTechnicians.filter(user => sanitizeKey(user.id) !== sanitizeKey(id));
-        if (role !== 'admin') cloudTechnicians.push({ id, name, team, role });
-        renderTeamsUI();
-        renderTeamMembers();
-        document.getElementById('addMemberForm').reset();
-        showToast(`${role === 'admin' ? 'Admin' : 'Technician'} account ${id} created.`);
-      } catch (err) {
-        showToast(`Could not create account: ${err.message}`);
-      }
+        await postCloudAction({action:'addUser',id,name,pass,team,role});
+        ROSTER_MAP[id]={id,name,team,role};
+        cloudTechnicians=cloudTechnicians.filter(u=>sanitizeKey(u.id)!==sanitizeKey(id));
+        if(role!=='admin') cloudTechnicians.push({id,name,team,role});
+        renderTeamsUI();renderTeamMembers();document.getElementById('addMemberForm').reset();
+        showToast(`Beta account ${id} added in this browser only.`);
+      } catch(err) { showToast(`Could not save beta account: ${err.message}`); }
     }
 
     function updateNewUserRoleFields() {
@@ -1254,32 +1498,20 @@
 
     async function saveOwnPassword(event) {
       event.preventDefault();
-      const error = document.getElementById('ownPasswordError');
-      const button = document.getElementById('ownPasswordSaveButton');
-      const currentPassword = document.getElementById('ownPasswordCurrent').value;
-      const newPassword = document.getElementById('ownPasswordNew').value;
-      const confirmPassword = document.getElementById('ownPasswordConfirm').value;
-      const fail = message => { error.textContent = message; error.classList.remove('hidden'); };
-      if (!currentUser || currentUser.role === 'admin') return;
-      if (newPassword.trim().length < 6) return fail('Use at least 6 characters for the new password.');
-      if (newPassword !== confirmPassword) return fail('The new passwords do not match.');
-      button.disabled = true;
-      button.textContent = 'Updating…';
-      try {
-        const response = await fetch(CLOUD_API_URL, {
-          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action:'changeOwnPassword', id:currentUser.id, currentPassword, newPassword })
-        });
-        const result = await response.json();
-        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Could not update password');
-        closeModal('ownPasswordModal');
-        showToast('Password updated. Use your new password next time you sign in.');
-      } catch (err) {
-        fail(err.message || 'Could not update the password. Try again.');
-      } finally {
-        button.disabled = false;
-        button.textContent = 'Save Password';
-      }
+      const error=document.getElementById('ownPasswordError');
+      const currentPassword=document.getElementById('ownPasswordCurrent').value;
+      const newPassword=document.getElementById('ownPasswordNew').value;
+      const confirmPassword=document.getElementById('ownPasswordConfirm').value;
+      const fail=message=>{error.textContent=message;error.classList.remove('hidden');};
+      if(!currentUser||currentUser.role==='admin')return;
+      if(newPassword.trim().length<6)return fail('Use at least 6 characters for the new password.');
+      if(newPassword!==confirmPassword)return fail('The new passwords do not match.');
+      try{
+        const response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'changeOwnPassword',id:currentUser.id,currentPassword,newPassword})});
+        const result=await response.json();
+        if(!response.ok||result.status!=='success')throw new Error(result.message||'Could not update password');
+        closeModal('ownPasswordModal');showToast('Beta password changed in this browser only.');
+      }catch(err){fail(err.message||'Could not change the password.');}
     }
 
     // --- CLOUD TECHNICIAN REMINDERS ---
@@ -1759,7 +1991,7 @@
               <b>Due:</b> ${info.dueDateFormatted} (${info.status})<br/>
               ${asset.assignedTech ? `<span style="color:#0f766e; font-weight:bold;">Assigned: ${asset.assignedTech}</span><br/>` : ''}
               <div style="margin-top: 8px; display:flex; gap: 4px; flex-wrap:wrap;">
-                ${info.status === 'Maintenance Hold' ? '<span style="background:#334155; color:#cbd5e1; padding:4px 8px; border-radius:4px; font-size:11px;">Maintenance Hold</span>' : `<button onclick="openMaintenanceModal('${asset.id}')" style="background:#0f766e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px;">Inspect & Close</button>`}
+                ${info.status === 'Maintenance Hold' ? '<span style="background:#334155; color:#cbd5e1; padding:4px 8px; border-radius:4px; font-size:11px;">Maintenance Hold</span>' : `<button onclick="openMaintenanceModal('${asset.id}')" style="background:#0f766e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px;">Record Maintenance</button>`}
                 <a href="https://www.google.com/maps/dir/?api=1&destination=${asset.lat},${asset.lng}" target="_blank" style="background:#1e293b; color:#38bdf8; border:none; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px;">
                   Navigate
                 </a>
@@ -1814,11 +2046,11 @@
                 <button onclick="openAssignModal('${asset.id}')" title="Assign Technician" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700">
                   <i class="fa-solid fa-user-tag"></i>
                 </button>
-                <button onclick="openAssetHistory('${asset.id}')" title="Maintenance History" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700">
-                  <i class="fa-solid fa-timeline"></i>
-                </button>
               ` : ''}
-              ${info.status === 'Maintenance Hold' ? '<span class="px-2.5 py-1.5 bg-slate-800 text-slate-400 rounded text-[10px]">Hold</span>' : `<button onclick="openMaintenanceModal('${asset.id}')" class="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded text-xs shadow flex items-center gap-1"><i class="fa-solid fa-clipboard-check"></i> <span class="hidden sm:inline">Close</span></button>`}
+              <button onclick="openAssetHistory('${asset.id}')" title="View Asset Maintenance History" aria-label="View ${asset.id} maintenance history" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700">
+                <i class="fa-solid fa-timeline"></i>
+              </button>
+              ${info.status === 'Maintenance Hold' ? '<span class="px-2.5 py-1.5 bg-slate-800 text-slate-400 rounded text-[10px]">Hold</span>' : `<button title="Record Maintenance" onclick="openMaintenanceModal('${asset.id}')" class="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded text-xs shadow flex items-center gap-1"><i class="fa-solid fa-clipboard-check"></i> <span class="hidden sm:inline">Record Maintenance</span></button>`}
             </div>
           </td>
         `;
@@ -2042,8 +2274,8 @@
         document.getElementById('maintObservations').value = draft.observations || '';
         document.getElementById('maintRemarks').value = draft.remarks || '';
         if (currentUser.role === 'admin') techSelect.value = draft.technician || '';
-        if (draft.beforePhoto) document.getElementById('beforePreview').innerHTML = `<img src="${draft.beforePhoto}" class="w-full h-full object-cover">`;
-        if (draft.afterPhoto) document.getElementById('afterPreview').innerHTML = `<img src="${draft.afterPhoto}" class="w-full h-full object-cover">`;
+        if (draft.beforePhoto) document.getElementById('beforePreview').innerHTML = `<img src="${draft.beforePhoto}" alt="Before maintenance" onclick="openPhotoPreviewImage(this.src,'Before Photo')" class="photo-preview-trigger w-full h-full object-cover">`;
+        if (draft.afterPhoto) document.getElementById('afterPreview').innerHTML = `<img src="${draft.afterPhoto}" alt="After maintenance" onclick="openPhotoPreviewImage(this.src,'After Photo')" class="photo-preview-trigger w-full h-full object-cover">`;
       }
       persistMaintenanceDraftNow(true);
       openModal('maintenanceModal');
@@ -2065,7 +2297,8 @@
           canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
           canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
           const compressed = canvas.toDataURL('image/jpeg', 0.78);
-          document.getElementById(targetId).innerHTML = `<img src="${compressed}" class="w-full h-full object-cover">`;
+          const photoLabel = targetId === 'beforePreview' ? 'Before Photo' : 'After Photo';
+          document.getElementById(targetId).innerHTML = `<img src="${compressed}" alt="${photoLabel}" onclick="openPhotoPreviewImage(this.src,'${photoLabel}')" class="photo-preview-trigger w-full h-full object-cover">`;
           saveMaintenanceDraft();
         };
         image.onerror = () => showToast('Could not read this photo. Please choose another image.');
@@ -2077,6 +2310,77 @@
     function getPhotoLink(value) {
       const link = String(value || '').trim();
       return /^https?:\/\//i.test(link) ? link : '';
+    }
+
+    function openPhotoPreview(value, label = 'Maintenance Photo') {
+      const link = getPhotoLink(value);
+      const modal = document.getElementById('photoPreviewModal');
+      const image = document.getElementById('photoPreviewImage');
+      const frame = document.getElementById('photoPreviewFrame');
+      const error = document.getElementById('photoPreviewError');
+      if (!link) return showToast('Photo link is unavailable.');
+
+      document.getElementById('photoPreviewTitle').textContent = label;
+      image.classList.add('hidden');
+      frame.classList.add('hidden');
+      error.classList.add('hidden');
+      image.onload = null;
+      image.onerror = null;
+      frame.src = 'about:blank';
+
+      let url;
+      try { url = new URL(link); } catch (_) { return showToast('This photo link is not valid.'); }
+      const driveFileId = url.hostname.endsWith('google.com')
+        ? (url.pathname.match(/\/file\/d\/([^/]+)/)?.[1] || url.searchParams.get('id'))
+        : null;
+
+      if (driveFileId && (url.hostname === 'drive.google.com' || url.hostname.endsWith('.drive.google.com'))) {
+        frame.src = `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/preview`;
+        frame.classList.remove('hidden');
+      } else if (/^data:image\//i.test(link) || /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i.test(url.pathname + url.search)) {
+        image.onload = () => image.classList.remove('hidden');
+        image.onerror = () => { image.classList.add('hidden'); error.classList.remove('hidden'); };
+        image.src = link;
+      } else {
+        frame.src = link;
+        frame.classList.remove('hidden');
+      }
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function openPhotoPreviewImage(src, label = 'Maintenance Photo') {
+      const modal = document.getElementById('photoPreviewModal');
+      const image = document.getElementById('photoPreviewImage');
+      const frame = document.getElementById('photoPreviewFrame');
+      const error = document.getElementById('photoPreviewError');
+      document.getElementById('photoPreviewTitle').textContent = label;
+      frame.src = 'about:blank';
+      frame.classList.add('hidden');
+      error.classList.add('hidden');
+      image.src = src;
+      image.classList.remove('hidden');
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function closePhotoPreview() {
+      document.getElementById('photoPreviewModal').classList.add('hidden');
+      document.getElementById('photoPreviewImage').src = '';
+      document.getElementById('photoPreviewFrame').src = 'about:blank';
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    function appendPhotoPreviewButton(container, value, label, buttonText) {
+      const link = getPhotoLink(value);
+      if (!link || !container) return false;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'text-xs font-semibold text-teal-700 hover:text-green-800 underline underline-offset-2';
+      button.textContent = buttonText;
+      button.addEventListener('click', () => openPhotoPreview(link, label));
+      container.appendChild(button);
+      return true;
     }
 
     async function submitMaintenance(e) {
@@ -2158,7 +2462,7 @@
         showToast("Cloud save failed; date unchanged. Please retry.");
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-check"></i> Close & Sync to Drive`;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Submit Maintenance`;
         hideLoader();
       }
     }
@@ -2284,6 +2588,314 @@
       const synced = await syncAssetsToCloud(false);
       showToast(synced ? 'Assignment cleared' : 'Saved here, but cloud sync failed. Try Sync again.');
     }
+
+    function adminAssetApi(action, payload = {}) {
+      if (!currentUser || currentUser.role !== 'admin') return Promise.reject(new Error('Admin access required.'));
+      if (!adminSessionToken) return Promise.reject(new Error('Deploy the updated Apps Script first, then sign in again to enable the admin-only asset database.'));
+      return fetch(CLOUD_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, sessionToken: adminSessionToken, ...payload })
+      }).then(async response => {
+        const result = await response.json();
+        if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Admin data request failed.');
+        return result;
+      });
+    }
+
+    function openAdminAssetMaster() {
+      if (!currentUser || currentUser.role !== 'admin') return showToast('Admin access required.');
+      document.getElementById('adminAssetMasterModal').classList.remove('hidden');
+      document.getElementById('adminAssetMasterStatus').textContent = '';
+      selectedAdminDataset = document.getElementById('adminAssetDatasetSelect').value || 'assets';
+      loadAdminAssetMaster();
+    }
+
+    const ADMIN_DATASET_LABELS = {
+      assets: 'Asset / Customer Master',
+      maintenance: 'Maintenance Excel Database',
+      ipng_cpng: 'IPNG / CPNG Database'
+    };
+
+    function changeAdminDataset() {
+      selectedAdminDataset = document.getElementById('adminAssetDatasetSelect').value;
+      pendingAdminAssetImport = null;
+      document.getElementById('adminAssetWorkbookInput').value = '';
+      document.getElementById('adminAssetImportButton').disabled = true;
+      document.getElementById('adminAssetImportSummary').textContent = '';
+      document.getElementById('adminAssetSearch').value = '';
+      document.getElementById('adminAssetMasterStatus').textContent = '';
+      loadAdminAssetMaster();
+    }
+
+    function closeAdminAssetMaster() {
+      closeModal('adminAssetMasterModal');
+      adminAssetRecords = [];
+      adminAssetActivities = [];
+      adminAssetColumns = [];
+      document.getElementById('adminAssetMasterList').replaceChildren();
+    }
+
+    async function loadAdminAssetMaster() {
+      const status = document.getElementById('adminAssetMasterStatus');
+      status.textContent = 'Loading protected admin records…';
+      try {
+        const result = await adminAssetApi('getAdminAssetMaster', { datasetType: selectedAdminDataset });
+        adminAssetColumns = Array.isArray(result.columns) ? result.columns : [];
+        adminAssetRecords = Array.isArray(result.records) ? result.records : [];
+        adminAssetActivities = Array.isArray(result.activities) ? result.activities : [];
+        status.textContent = adminAssetRecords.length ? `${ADMIN_DATASET_LABELS[selectedAdminDataset]} loaded securely.` : `No ${ADMIN_DATASET_LABELS[selectedAdminDataset]} has been imported yet.`;
+        renderAdminAssetMasterList();
+      } catch (error) {
+        status.textContent = error.message;
+        adminAssetRecords = [];
+        renderAdminAssetMasterList();
+      }
+    }
+
+    function workbookCellText(sheet, row, column) {
+      const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
+      return cell ? String(XLSX.utils.format_cell(cell) || '').trim() : '';
+    }
+
+    function adminColumnSlug(value) {
+      return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || 'field';
+    }
+
+    async function previewAdminAssetWorkbook(input) {
+      pendingAdminAssetImport = null;
+      const button = document.getElementById('adminAssetImportButton');
+      const summary = document.getElementById('adminAssetImportSummary');
+      button.disabled = true;
+      summary.textContent = '';
+      if (!input.files || !input.files[0]) return;
+      if (currentUser?.role !== 'admin') return showToast('Admin access required.');
+      if (!window.XLSX) { summary.textContent = 'Excel reader did not load. Refresh the beta page and try again.'; return; }
+      try {
+        const workbook = XLSX.read(await input.files[0].arrayBuffer(), { type: 'array', cellDates: false });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet || !sheet['!ref']) throw new Error('The workbook has no readable first sheet.');
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        if (range.e.r < 1) throw new Error('The selected sheet must contain a header row and at least one data row.');
+        const merges = sheet['!merges'] || [];
+        let headerRow = range.s.r;
+        let highestHeaderCount = -1;
+        const nonEmptyCounts = [];
+        const headerSearchEnd = Math.min(range.e.r, range.s.r + 7);
+        for (let row = range.s.r; row <= headerSearchEnd; row++) {
+          let nonEmpty = 0;
+          for (let column = range.s.c; column <= range.e.c; column++) if (workbookCellText(sheet, row, column)) nonEmpty++;
+          nonEmptyCounts.push({ row, nonEmpty });
+          if (nonEmpty > highestHeaderCount) { highestHeaderCount = nonEmpty; headerRow = row; }
+        }
+        headerRow = (nonEmptyCounts.find(item => item.nonEmpty >= highestHeaderCount * 0.9) || { row: headerRow }).row;
+        if (headerRow >= range.e.r) throw new Error('Could not find both a header row and data rows.');
+        const columns = [];
+        const usedKeys = new Set();
+        for (let column = range.s.c; column <= range.e.c; column++) {
+          const groupRow = headerRow - 1;
+          const merge = merges.find(item => item.s.r === groupRow && item.e.r === groupRow && item.s.c <= column && item.e.c >= column);
+          const groupCellColumn = merge ? merge.s.c : column;
+          const group = (groupRow >= range.s.r ? workbookCellText(sheet, groupRow, groupCellColumn) : '') || ADMIN_DATASET_LABELS[selectedAdminDataset];
+          const field = workbookCellText(sheet, headerRow, column) || `Column ${column + 1}`;
+          let key = `${adminColumnSlug(group)}__${adminColumnSlug(field)}`;
+          let suffix = 2;
+          while (usedKeys.has(key)) key = `${adminColumnSlug(group)}__${adminColumnSlug(field)}_${suffix++}`;
+          usedKeys.add(key);
+          columns.push({ key, group, label: field, sourceColumn: XLSX.utils.encode_col(column) });
+        }
+
+        const serialColumn = columns.findIndex(column => /sl\s*no|serial|record\s*id|log\s*id|asset\s*id|customer\s*id/i.test(column.label));
+        const records = [];
+        const usedIds = new Set();
+        for (let row = headerRow + 1; row <= range.e.r; row++) {
+          const values = columns.map((_, idx) => workbookCellText(sheet, row, range.s.c + idx));
+          if (!values.some(value => value)) continue;
+          const sourceRow = row + 1;
+          const serial = serialColumn >= 0 ? values[serialColumn] : '';
+          const validSerial = serial && !/^(no data|not found|not applicable|n\/a|na|-)$/i.test(serial);
+          let recordId = validSerial ? `ROW-${adminColumnSlug(serial).toUpperCase()}` : `ROW-EXCEL-${sourceRow}`;
+          let duplicate = 2;
+          while (usedIds.has(recordId)) recordId = `${recordId}-${duplicate++}`;
+          usedIds.add(recordId);
+          const record = { recordId, sourceRow };
+          columns.forEach((column, index) => { record[column.key] = values[index]; });
+          records.push(record);
+        }
+        if (!records.length) throw new Error('No data rows were found under the header.');
+        pendingAdminAssetImport = { columns, records, sheetName, datasetType: selectedAdminDataset };
+        button.disabled = false;
+        summary.textContent = `Destination: ${ADMIN_DATASET_LABELS[selectedAdminDataset]}. Ready to import ${records.length} rows and ${columns.length} columns from “${sheetName}”. Nothing is uploaded until you choose Import.`;
+      } catch (error) {
+        summary.textContent = `Could not read workbook: ${error.message}`;
+      }
+    }
+
+    async function importAdminAssetWorkbook() {
+      if (!pendingAdminAssetImport || currentUser?.role !== 'admin') return;
+      const { columns, records, datasetType } = pendingAdminAssetImport;
+      if (datasetType !== selectedAdminDataset) return showToast('Database selection changed. Choose the Excel file again.');
+      if (!confirm(`Replace only “${ADMIN_DATASET_LABELS[datasetType]}” with ${records.length} rows? Other databases and app maintenance logs will remain unchanged.`)) return;
+      const button = document.getElementById('adminAssetImportButton');
+      const status = document.getElementById('adminAssetMasterStatus');
+      button.disabled = true;
+      status.textContent = 'Sending workbook to the protected admin database…';
+      try {
+        const result = await adminAssetApi('syncAdminAssetMaster', { datasetType, columns, records });
+        status.textContent = `${result.recordsImported} records imported to ${ADMIN_DATASET_LABELS[datasetType]}.`;
+        pendingAdminAssetImport = null;
+        document.getElementById('adminAssetWorkbookInput').value = '';
+        document.getElementById('adminAssetImportSummary').textContent = '';
+        await loadAdminAssetMaster();
+      } catch (error) {
+        status.textContent = error.message;
+        button.disabled = false;
+      }
+    }
+
+    function adminField(record, pattern) {
+      const column = adminAssetColumns.find(item => item.key.endsWith(`__${pattern}`));
+      return column ? String(record[column.key] || '').trim() : '';
+    }
+
+    function renderAdminAssetMasterList() {
+      const list = document.getElementById('adminAssetMasterList');
+      if (!list) return;
+      list.replaceChildren();
+      document.getElementById('adminAssetRecordCount').textContent = adminAssetRecords.length;
+      const query = (document.getElementById('adminAssetSearch')?.value || '').trim().toLowerCase();
+      const filtered = adminAssetRecords.filter(record => {
+        if (!query) return true;
+        return adminAssetColumns.some(column => String(record[column.key] || '').toLowerCase().includes(query));
+      });
+      if (!adminAssetRecords.length) {
+        const empty = document.createElement('p');
+        empty.className = 'col-span-full text-center text-slate-400 p-6';
+        empty.textContent = currentUser?.role === 'admin' ? `No records are loaded in ${ADMIN_DATASET_LABELS[selectedAdminDataset]}. Choose a matching Excel file above.` : 'Admin access required.';
+        list.appendChild(empty);
+        return;
+      }
+      if (!filtered.length) {
+        const empty = document.createElement('p'); empty.className = 'col-span-full text-center text-slate-400 p-6'; empty.textContent = 'No matching records.'; list.appendChild(empty); return;
+      }
+      filtered.forEach(record => {
+        const card = document.createElement('article');
+        card.className = 'rounded-xl border border-slate-700 bg-slate-900/80 p-3 space-y-2';
+        const title = document.createElement('h4'); title.className = 'font-bold text-white';
+        const firstDisplayValue = adminAssetColumns.map(column => String(record[column.key] || '').trim()).find(Boolean);
+        title.textContent = selectedAdminDataset === 'assets' ? (adminField(record, 'name_of_the_customer') || `Asset record ${record.recordId}`) : (firstDisplayValue || `Record ${record.recordId}`);
+        const summary = document.createElement('p'); summary.className = 'text-slate-400';
+        summary.textContent = selectedAdminDataset === 'assets' ? `Customer ID: ${adminField(record, 'customer_id') || 'Not available'} · ${adminField(record, 'location') || 'Location not available'}` : `Source row ${record.sourceRow || '—'} · ${ADMIN_DATASET_LABELS[selectedAdminDataset]}`;
+        const equipment = document.createElement('p'); equipment.className = 'text-slate-300';
+        equipment.textContent = selectedAdminDataset === 'assets' ? `Status: ${adminField(record, 'status_running_td_pd') || 'Not specified'} · DRS: ${adminField(record, 'drs_name') || '—'} · MDPE Valve: ${adminField(record, 'mdpe_valve_no') || '—'}` : adminAssetColumns.slice(1, 4).map(column => `${column.label}: ${record[column.key] || '—'}`).join(' · ');
+        const action = document.createElement('button'); action.type = 'button';
+        action.className = 'px-3 py-1.5 rounded-lg bg-teal-700 text-white font-semibold'; action.textContent = 'View Full Details & History';
+        action.addEventListener('click', () => openAdminAssetDetails(record.recordId));
+        card.append(title, summary, equipment, action);
+        list.appendChild(card);
+      });
+    }
+
+    function openAdminAssetDetails(recordId) {
+      if (currentUser?.role !== 'admin') return showToast('Admin access required.');
+      selectedAdminAssetRecord = adminAssetRecords.find(record => record.recordId === recordId);
+      if (!selectedAdminAssetRecord) return showToast('Record not found. Refresh the selected database.');
+      const record = selectedAdminAssetRecord;
+      const firstDisplayValue = adminAssetColumns.map(column => String(record[column.key] || '').trim()).find(Boolean);
+      document.getElementById('adminAssetDetailTitle').textContent = selectedAdminDataset === 'assets' ? (adminField(record, 'name_of_the_customer') || `Asset record ${record.recordId}`) : (firstDisplayValue || `Record ${record.recordId}`);
+      document.getElementById('adminAssetDetailSubtitle').textContent = `${ADMIN_DATASET_LABELS[selectedAdminDataset]} · Record ${record.recordId} · Source row ${record.sourceRow || '—'}`;
+      const groups = document.getElementById('adminAssetDetailGroups');
+      groups.replaceChildren();
+      const byGroup = new Map();
+      adminAssetColumns.forEach(column => {
+        const value = String(record[column.key] || '').trim();
+        if (!value) return;
+        if (!byGroup.has(column.group)) byGroup.set(column.group, []);
+        byGroup.get(column.group).push({ label: column.label, value });
+      });
+      byGroup.forEach((fields, groupName) => {
+        const section = document.createElement('section'); section.className = 'rounded-xl border border-slate-700 bg-slate-900/80 p-3';
+        const heading = document.createElement('h4'); heading.className = 'font-bold text-teal-300 border-b border-slate-700 pb-2 mb-2'; heading.textContent = groupName;
+        const body = document.createElement('dl'); body.className = 'grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2';
+        fields.forEach(field => {
+          const item = document.createElement('div'); item.className = 'min-w-0';
+          const dt = document.createElement('dt'); dt.className = 'text-slate-500'; dt.textContent = field.label;
+          const dd = document.createElement('dd'); dd.className = 'text-slate-200 break-words'; dd.textContent = field.value;
+          item.append(dt, dd); body.appendChild(item);
+        });
+        section.append(heading, body); groups.appendChild(section);
+      });
+      const activitySection = document.getElementById('adminAssetActivityForm').parentElement;
+      activitySection.classList.toggle('hidden', selectedAdminDataset !== 'assets');
+      const date = document.getElementById('adminActivityDate');
+      if (date && !date.value) date.value = localDateKey();
+      renderAdminAssetActivityHistory(record);
+      openModal('adminAssetDetailModal');
+    }
+
+    function renderAdminAssetActivityHistory(record) {
+      const container = document.getElementById('adminAssetActivityList');
+      container.replaceChildren();
+      const activityRows = adminAssetActivities.filter(item => String(item.recordId) === String(record.recordId)).map(item => ({
+        date: item.activityDate, type: item.activityType, component: item.component,
+        previousValue: item.previousValue, newValue: item.newValue, tech: item.performedBy, remarks: item.remarks
+      }));
+      const linkedIds = new Set();
+      adminAssetColumns.filter(column => /customer_id|meter_no|serial_no|sr_no|valve_no|mjc_no/i.test(column.key)).forEach(column => {
+        const value = String(record[column.key] || '').trim();
+        if (value && !/^(no data|not found|not applicable|n\/a|na|-)$/i.test(value)) linkedIds.add(sanitizeKey(value));
+      });
+      maintenanceHistory.filter(log => linkedIds.has(sanitizeKey(log.assetId))).forEach(log => activityRows.push({
+        date: log.date, type: 'Maintenance', component: log.assetId, tech: log.tech,
+        remarks: [log.observations, log.remarks].filter(Boolean).join(' · '), beforePhoto: log.beforePhoto, afterPhoto: log.afterPhoto
+      }));
+      activityRows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+      if (!activityRows.length) {
+        const empty = document.createElement('p'); empty.className = 'text-slate-500 p-3'; empty.textContent = 'No activity records yet.'; container.appendChild(empty); return;
+      }
+      activityRows.forEach(item => {
+        const card = document.createElement('article'); card.className = 'rounded-lg border border-slate-800 bg-slate-900/70 p-3';
+        const title = document.createElement('div'); title.className = 'flex flex-wrap justify-between gap-2 font-semibold text-white';
+        const kind = document.createElement('span'); kind.textContent = [item.type, item.component].filter(Boolean).join(' · ');
+        const date = document.createElement('span'); date.className = 'text-teal-300'; date.textContent = formatToDDMMYYYY(item.date);
+        title.append(kind, date); card.appendChild(title);
+        if (item.tech) { const who = document.createElement('p'); who.className = 'text-slate-400 mt-1'; who.textContent = `By: ${item.tech}`; card.appendChild(who); }
+        if (item.previousValue || item.newValue) { const change = document.createElement('p'); change.className = 'text-slate-300 mt-1'; change.textContent = `${item.previousValue || '—'} → ${item.newValue || '—'}`; card.appendChild(change); }
+        if (item.remarks) { const remarks = document.createElement('p'); remarks.className = 'text-slate-300 mt-1'; remarks.textContent = item.remarks; card.appendChild(remarks); }
+        if (item.beforePhoto) appendPhotoPreviewButton(card, item.beforePhoto, 'Before Photo · ' + item.component, 'View Before');
+        if (item.afterPhoto) appendPhotoPreviewButton(card, item.afterPhoto, 'After Photo · ' + item.component, 'View After');
+        container.appendChild(card);
+      });
+    }
+
+    async function submitAdminAssetActivity(event) {
+      event.preventDefault();
+      if (!selectedAdminAssetRecord || currentUser?.role !== 'admin') return;
+      const form = document.getElementById('adminAssetActivityForm');
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      try {
+        await adminAssetApi('addAdminAssetActivity', {
+          recordId: selectedAdminAssetRecord.recordId,
+          activityType: document.getElementById('adminActivityType').value,
+          activityDate: document.getElementById('adminActivityDate').value,
+          component: document.getElementById('adminActivityComponent').value,
+          previousValue: document.getElementById('adminActivityPreviousValue').value,
+          newValue: document.getElementById('adminActivityNewValue').value,
+          remarks: document.getElementById('adminActivityRemarks').value
+        });
+        form.reset();
+        document.getElementById('adminActivityDate').value = localDateKey();
+      const result = await adminAssetApi('getAdminAssetMaster', { datasetType: selectedAdminDataset });
+        adminAssetActivities = Array.isArray(result.activities) ? result.activities : [];
+        renderAdminAssetActivityHistory(selectedAdminAssetRecord);
+        showToast('Activity added to asset history.');
+      } catch (error) { showToast(error.message); }
+      finally { button.disabled = false; }
+    }
+
     // --- TIMELINE & PROGRESS ---
     function openAssetHistory(assetId) {
       document.getElementById('historyAssetHeader').textContent = `Asset: ${assetId}`;
@@ -2305,11 +2917,14 @@
             </div>
             <p class="text-slate-300 text-[11px]"><b>Observations:</b> ${rec.observations || '--'}</p>
             <p class="text-slate-400 text-[11px]"><b>Remarks:</b> ${rec.remarks || '--'}</p>
-            <div class="flex items-center gap-3 pt-1">
-              ${getPhotoLink(rec.beforePhoto) ? `<a href="${getPhotoLink(rec.beforePhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline mr-2">View Before (Drive)</a>` : (rec.beforePhoto ? '<span class="text-xs text-slate-500 mr-2">Before photo link unavailable</span>' : '')}
-              ${getPhotoLink(rec.afterPhoto) ? `<a href="${getPhotoLink(rec.afterPhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View After (Drive)</a>` : (rec.afterPhoto ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : '')}
+            <div class="flex items-center gap-3 pt-1 photoPreviewButtons">
+              ${rec.beforePhoto && !getPhotoLink(rec.beforePhoto) ? '<span class="text-xs text-slate-500">Before photo link unavailable</span>' : ''}
+              ${rec.afterPhoto && !getPhotoLink(rec.afterPhoto) ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : ''}
             </div>
           `;
+          const photoButtons = card.querySelector('.photoPreviewButtons');
+          appendPhotoPreviewButton(photoButtons, rec.beforePhoto, 'Before Photo · ' + rec.assetId, 'View Before');
+          appendPhotoPreviewButton(photoButtons, rec.afterPhoto, 'After Photo · ' + rec.assetId, 'View After');
           container.appendChild(card);
         });
       }
@@ -2335,11 +2950,14 @@
               <span class="text-[11px] text-teal-400 font-mono">${formatToDDMMYYYY(job.date)}</span>
             </div>
             <p class="text-slate-400 text-[11px]"><b>Observations:</b> ${job.observations || 'N/A'}</p>
-            <div class="flex items-center gap-3 pt-1">
-              ${getPhotoLink(job.beforePhoto) ? `<a href="${getPhotoLink(job.beforePhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View Before Photo</a>` : (job.beforePhoto ? '<span class="text-xs text-slate-500">Before photo link unavailable</span>' : '')}
-              ${getPhotoLink(job.afterPhoto) ? `<a href="${getPhotoLink(job.afterPhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View After Photo</a>` : (job.afterPhoto ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : '')}
+            <div class="flex items-center gap-3 pt-1 photoPreviewButtons">
+              ${job.beforePhoto && !getPhotoLink(job.beforePhoto) ? '<span class="text-xs text-slate-500">Before photo link unavailable</span>' : ''}
+              ${job.afterPhoto && !getPhotoLink(job.afterPhoto) ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : ''}
             </div>
           `;
+          const photoButtons = card.querySelector('.photoPreviewButtons');
+          appendPhotoPreviewButton(photoButtons, job.beforePhoto, 'Before Photo · ' + job.assetId, 'View Before');
+          appendPhotoPreviewButton(photoButtons, job.afterPhoto, 'After Photo · ' + job.assetId, 'View After');
           container.appendChild(card);
         });
       }
@@ -2515,7 +3133,7 @@
               id: user.id, name: user.name, team: user.team || "",
               role: String(user.role || "tech").toLowerCase()
             })).filter(user => user.name && ["tech", "technician", "admin"].includes(user.role));
-            if (currentUser && currentUser.role === "admin") { renderTeamsUI(); renderTeamMembers(); }
+            if (currentUser && currentUser.role === "admin") renderTeamsUI();
           }
           if (json.assets && json.assets.length) {
             const rawAssets = json.assets.map(a => ({
@@ -2770,12 +3388,15 @@
           <td class="p-2 font-semibold text-white">${r.assetId}</td>
           <td class="p-2">${r.tech}</td>
           <td class="p-2 text-slate-400">${r.remarks || '--'}</td>
-          <td class="p-2 text-center">
-            ${getPhotoLink(r.beforePhoto) ? `<a href="${getPhotoLink(r.beforePhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline mr-2">Before</a>` : (r.beforePhoto ? '<span class="text-slate-500 mr-2">Before unavailable</span>' : '')}
-            ${getPhotoLink(r.afterPhoto) ? `<a href="${getPhotoLink(r.afterPhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">After</a>` : (r.afterPhoto ? '<span class="text-slate-500">After unavailable</span>' : '')}
+          <td class="p-2 text-center"><div class="flex items-center justify-center gap-3 photoPreviewButtons">
             ${!r.beforePhoto && !r.afterPhoto ? '<span class="text-slate-600">None</span>' : ''}
-          </td>
+            ${r.beforePhoto && !getPhotoLink(r.beforePhoto) ? '<span class="text-slate-500">Before unavailable</span>' : ''}
+            ${r.afterPhoto && !getPhotoLink(r.afterPhoto) ? '<span class="text-slate-500">After unavailable</span>' : ''}
+          </div></td>
         `;
+        const photoButtons = tr.querySelector('.photoPreviewButtons');
+        appendPhotoPreviewButton(photoButtons, r.beforePhoto, 'Before Photo · ' + r.assetId, 'Before');
+        appendPhotoPreviewButton(photoButtons, r.afterPhoto, 'After Photo · ' + r.assetId, 'After');
         tbody.appendChild(tr);
       });
     }
@@ -2954,7 +3575,7 @@ function applyLptData(data){lptHydrating=true;lptData={...data};lptIsEditing=!!d
  const expected=Math.min(100,Math.max(1,Math.floor((Number(data.totalTestMinutes)||120)/(Number(data.frequencyMinutes)||30))+1));while(lptReadings.length<expected)lptReadings.push({});
  rebuildLptReadings(true);updateLptPressureDrop();lptHydrating=false;updateLptActionButtons();
 }
-async function saveLptDraft(showMessage=true){if(lptSaving||lptSubmitting){lptSaveQueued=true;return;}if(!lptDirty&&!showMessage)return; lptSaving=true;updateLptActionButtons();const data=collectLptFormData();persistLptLocally();try{const r=await lptApiPost('saveDraft',{data});lptData={...data,draftId:r.draftId,reportNo:r.reportNo||data.reportNo};lptDirty=false;lptSaveQueued=false;persistLptLocally();if(showMessage)setLptStatus('Draft saved to the shared LPT sheet.','text-teal-300');refreshLptLists();}catch(e){if(showMessage)setLptStatus(`Could not sync draft yet: ${e.message}. Your work remains saved on this device.`,'text-amber-300');}finally{lptSaving=false;updateLptActionButtons();}}
+async function saveLptDraft(showMessage=true){if(lptSaving||lptSubmitting){lptSaveQueued=true;return;}if(!lptDirty&&!showMessage)return; lptSaving=true;updateLptActionButtons();const data=collectLptFormData();persistLptLocally();try{const r=await lptApiPost('saveDraft',{data});lptData={...data,draftId:r.draftId,reportNo:r.reportNo||data.reportNo};lptDirty=false;lptSaveQueued=false;persistLptLocally();if(showMessage)setLptStatus('Draft saved in this browser’s beta data only.','text-teal-300');refreshLptLists();}catch(e){if(showMessage)setLptStatus(`Beta draft save failed: ${e.message}. Your work remains saved on this device.`,'text-amber-300');}finally{lptSaving=false;updateLptActionButtons();}}
 async function waitForLptSave(){if(lptAutoSaveTimer){clearTimeout(lptAutoSaveTimer);lptAutoSaveTimer=null;}if(lptDirty)await saveLptDraft(false);while(lptSaving)await new Promise(r=>setTimeout(r,150));}
 async function submitLptReport(event){if(event)event.preventDefault();const form=document.getElementById('lptReportForm');if(!form.reportValidity())return;if(lptSubmitting)return;
  if(lptHasSubmitted&&!lptDirty&&!confirm('This report is already submitted. Submit again to regenerate it?'))return;
@@ -2969,6 +3590,312 @@ async function openLptReport(no){try{setLptStatus('Loading submitted report…')
     
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !document.getElementById('photoPreviewModal').classList.contains('hidden')) closePhotoPreview();
+    });
+
+    const UI_TRANSLATIONS = {
+      'Sign In': { te: 'లాగిన్', hi: 'साइन इन' },
+      'User ID': { te: 'వినియోగదారు ఐడి', hi: 'यूज़र आईडी' },
+      'Password': { te: 'పాస్‌వర్డ్', hi: 'पासवर्ड' },
+      'Bhagyanagar Gas Limited': { te: 'భాగ్యనగర్ గ్యాస్ లిమిటెడ్', hi: 'भाग्यनगर गैस लिमिटेड' },
+      'Field Operations & Maintenance Portal': { te: 'ఫీల్డ్ ఆపరేషన్స్ & మెయింటెనెన్స్ పోర్టల్', hi: 'फील्ड ऑपरेशंस और मेंटेनेंस पोर्टल' },
+      'My Location': { te: 'నా స్థానం', hi: 'मेरी लोकेशन' },
+      'Asset': { te: 'ఆస్తి', hi: 'एसेट' },
+      'Frequency': { te: 'ఫ్రీక్వెన్సీ', hi: 'अंतराल' },
+      'Icons': { te: 'ఐకాన్లు', hi: 'आइकन' },
+      'Notice': { te: 'నోటీసు', hi: 'सूचना' },
+      'Staff Logins': { te: 'సిబ్బంది లాగిన్లు', hi: 'स्टाफ लॉगिन' },
+      'Reports': { te: 'రిపోర్టులు', hi: 'रिपोर्ट' },
+      'Progress': { te: 'ప్రగతి', hi: 'प्रगति' },
+      'Asset Maintenance': { te: 'ఆస్తి నిర్వహణ', hi: 'एसेट रखरखाव' },
+      'Other Maintenance': { te: 'ఇతర నిర్వహణ', hi: 'अन्य रखरखाव' },
+      'Total Unique Assets': { te: 'మొత్తం ప్రత్యేక ఆస్తులు', hi: 'कुल अलग एसेट' },
+      'Healthy': { te: 'సక్రమంగా ఉంది', hi: 'ठीक है' },
+      'Due Soon (≤15d)': { te: 'త్వరలో గడువు (≤15 రోజులు)', hi: 'जल्द देय (≤15 दिन)' },
+      'High Alert (Overdue)': { te: 'అధిక హెచ్చరిక (గడువు దాటింది)', hi: 'उच्च चेतावनी (समय सीमा पार)' },
+      'Search Asset ID, Location, Team, Technician...': { te: 'ఆస్తి ఐడి, స్థలం, టీమ్ లేదా టెక్నీషియన్ కోసం వెతకండి...', hi: 'एसेट आईडी, लोकेशन, टीम या तकनीशियन खोजें...' },
+      'All': { te: 'అన్నీ', hi: 'सभी' },
+      'Assets Registry': { te: 'ఆస్తుల జాబితా', hi: 'एसेट सूची' },
+      'Select assets to assign a technician': { te: 'టెక్నీషియన్‌ను కేటాయించడానికి ఆస్తులను ఎంచుకోండి', hi: 'तकनीशियन असाइन करने के लिए एसेट चुनें' },
+      'Deselect All': { te: 'ఎంపికలు తీసివేయి', hi: 'सभी हटाएँ' },
+      'Assign to Technician': { te: 'టెక్నీషియన్‌కు కేటాయించండి', hi: 'तकनीशियन को असाइन करें' },
+      'Asset Details': { te: 'ఆస్తి వివరాలు', hi: 'एसेट विवरण' },
+      'Type': { te: 'రకం', hi: 'प्रकार' },
+      'Team': { te: 'టీమ్', hi: 'टीम' },
+      'Distance': { te: 'దూరం', hi: 'दूरी' },
+      'Next Due': { te: 'తదుపరి గడువు', hi: 'अगली देय तारीख' },
+      'Status': { te: 'స్థితి', hi: 'स्थिति' },
+      'Actions': { te: 'చర్యలు', hi: 'कार्रवाई' },
+      'Record Maintenance': { te: 'మెయింటెనెన్స్ నమోదు', hi: 'रखरखाव दर्ज करें' },
+      'Submit Maintenance': { te: 'మెయింటెనెన్స్ సమర్పించండి', hi: 'रखरखाव जमा करें' },
+      'Technician': { te: 'టెక్నీషియన్', hi: 'तकनीशियन' },
+      'Date Conducted': { te: 'చేసిన తేదీ', hi: 'कार्य की तारीख' },
+      'Before Photo': { te: 'ముందు ఫోటో', hi: 'पहले की फोटो' },
+      'After Photo': { te: 'తర్వాత ఫోటో', hi: 'बाद की फोटो' },
+      'Observations / Checklist': { te: 'పరిశీలనలు / చెక్‌లిస్ట్', hi: 'निरीक्षण / चेकलिस्ट' },
+      'Remarks': { te: 'వ్యాఖ్యలు', hi: 'टिप्पणियाँ' },
+      'Cancel': { te: 'రద్దు', hi: 'रद्द करें' },
+      'Maintenance History': { te: 'మెయింటెనెన్స్ చరిత్ర', hi: 'रखरखाव इतिहास' },
+      'View Asset Maintenance History': { te: 'ఆస్తి మెయింటెనెన్స్ చరిత్ర చూడండి', hi: 'एसेट रखरखाव इतिहास देखें' },
+      'Maintenance Hold': { te: 'మెయింటెనెన్స్ నిలిపివేత', hi: 'रखरखाव रोका गया' },
+      'Pending Tasks Assigned to You': { te: 'మీకు కేటాయించిన పెండింగ్ పనులు', hi: 'आपको दिए गए लंबित कार्य' },
+      'Enable notifications': { te: 'నోటిఫికేషన్లు ప్రారంభించండి', hi: 'सूचनाएँ चालू करें' },
+      'Maintenance Audit Reports': { te: 'మెయింటెనెన్స్ ఆడిట్ రిపోర్టులు', hi: 'रखरखाव ऑडिट रिपोर्ट' },
+      'From Date': { te: 'ప్రారంభ తేదీ', hi: 'शुरू की तारीख' },
+      'To Date': { te: 'ముగింపు తేదీ', hi: 'अंतिम तारीख' },
+      'Close': { te: 'మూసివేయి', hi: 'बंद करें' },
+      'Save': { te: 'సేవ్ చేయి', hi: 'सहेजें' },
+      'Edit': { te: 'సవరించు', hi: 'संपादित करें' },
+      'Delete': { te: 'తొలగించు', hi: 'हटाएँ' },
+      'Location': { te: 'స్థలం', hi: 'लोकेशन' },
+      'Overdue': { te: 'గడువు దాటింది', hi: 'समय सीमा पार' },
+      'Due Soon': { te: 'త్వరలో గడువు', hi: 'जल्द देय' },
+      'Healthy': { te: 'సక్రమంగా ఉంది', hi: 'ठीक है' },
+      'Admin': { te: 'అడ్మిన్', hi: 'एडमिन' },
+      'Technician': { te: 'టెక్నీషియన్', hi: 'तकनीशियन' },
+      'Show all network': { te: 'మొత్తం నెట్‌వర్క్ చూపించు', hi: 'पूरा नेटवर्क दिखाएँ' },
+      'Pending Tasks Assigned to You': { te: 'మీకు కేటాయించిన పెండింగ్ పనులు', hi: 'आपको दिए गए लंबित कार्य' },
+      'Enable phone alerts': { te: 'ఫోన్ అలర్ట్‌లు ప్రారంభించండి', hi: 'फ़ोन अलर्ट चालू करें' },
+      'Enable phone notifications': { te: 'ఫోన్ నోటిఫికేషన్‌లు ప్రారంభించండి', hi: 'फ़ोन सूचनाएँ चालू करें' },
+      'Select assets': { te: 'ఆస్తులను ఎంచుకోండి', hi: 'एसेट चुनें' },
+      'Search': { te: 'వెతకండి', hi: 'खोजें' },
+      'Healthy assets': { te: 'సక్రమంగా ఉన్న ఆస్తులు', hi: 'ठीक एसेट' },
+      'Overdue assets': { te: 'గడువు దాటిన ఆస్తులు', hi: 'समय सीमा पार एसेट' },
+      'Distance': { te: 'దూరం', hi: 'दूरी' },
+      'Asset ID': { te: 'ఆస్తి ఐడి', hi: 'एसेट आईडी' },
+      'Customer Details': { te: 'కస్టమర్ వివరాలు', hi: 'ग्राहक विवरण' },
+      'Meter Details': { te: 'మీటర్ వివరాలు', hi: 'मीटर विवरण' },
+      'Regulator Details': { te: 'రెగ్యులేటర్ వివరాలు', hi: 'रेगुलेटर विवरण' },
+      'Activity History': { te: 'కార్యకలాపాల చరిత్ర', hi: 'गतिविधि इतिहास' },
+      'Maintenance activity': { te: 'మెయింటెనెన్స్ కార్యకలాపం', hi: 'रखरखाव गतिविधि' },
+      'Submit': { te: 'సమర్పించండి', hi: 'जमा करें' },
+      'Refresh': { te: 'రిఫ్రెష్', hi: 'रीफ़्रेश' },
+      'Sync': { te: 'సింక్', hi: 'सिंक' },
+      'Technician (Locked)': { te: 'టెక్నీషియన్ (లాక్ చేయబడింది)', hi: 'तकनीशियन (लॉक)' },
+      'No image': { te: 'చిత్రం లేదు', hi: 'कोई चित्र नहीं' },
+      'View Before': { te: 'ముందు ఫోటో చూడండి', hi: 'पहले की फोटो देखें' },
+      'View After': { te: 'తర్వాత ఫోటో చూడండి', hi: 'बाद की फोटो देखें' },
+      'Active': { te: 'యాక్టివ్', hi: 'सक्रिय' },
+      'Inactive (Maintenance Hold)': { te: 'ఇన్‌యాక్టివ్ (మెయింటెనెన్స్ నిలిపివేత)', hi: 'निष्क्रिय (रखरखाव रोका गया)' },
+      'Activation Date': { te: 'యాక్టివేషన్ తేదీ', hi: 'चालू होने की तारीख' },
+      'Activation / Reconnection Date': { te: 'యాక్టివేషన్ / రీకనెక్షన్ తేదీ', hi: 'चालू / पुनः कनेक्शन की तारीख' },
+      'Add New Staff Login': { te: 'కొత్త సిబ్బంది లాగిన్ జోడించండి', hi: 'नया स्टाफ लॉगिन जोड़ें' },
+      'Admin': { te: 'అడ్మిన్', hi: 'एडमिन' },
+      'Alerts': { te: 'అలర్ట్‌లు', hi: 'अलर्ट' },
+      'Apply Filter': { te: 'ఫిల్టర్ వర్తింపజేయండి', hi: 'फ़िल्टर लागू करें' },
+      'Area': { te: 'ప్రాంతం', hi: 'क्षेत्र' },
+      'Asset Details (Tap to copy)': { te: 'ఆస్తి వివరాలు (కాపీ చేయడానికి నొక్కండి)', hi: 'एसेट विवरण (कॉपी करने के लिए टैप करें)' },
+      'Asset ID *': { te: 'ఆస్తి ఐడి *', hi: 'एसेट आईडी *' },
+      'Asset ID (Locked)': { te: 'ఆస్తి ఐడి (లాక్ చేయబడింది)', hi: 'एसेट आईडी (लॉक)' },
+      'Assign': { te: 'కేటాయించండి', hi: 'असाइन करें' },
+      'Assign Asset to Team': { te: 'ఆస్తిని టీమ్‌కు కేటాయించండి', hi: 'एसेट टीम को असाइन करें' },
+      'Assign Tasks': { te: 'పనులు కేటాయించండి', hi: 'कार्य असाइन करें' },
+      'Assign Technician (This Cycle)': { te: 'టెక్నీషియన్‌ను కేటాయించండి (ఈ సైకిల్)', hi: 'तकनीशियन असाइन करें (इस चक्र के लिए)' },
+      'Assign to Technician:': { te: 'టెక్నీషియన్‌కు కేటాయించండి:', hi: 'तकनीशियन को असाइन करें:' },
+      'Backup Database': { te: 'డేటాబేస్ బ్యాకప్', hi: 'डेटाबेस बैकअप' },
+      'Basic Details': { te: 'ప్రాథమిక వివరాలు', hi: 'बुनियादी विवरण' },
+      'Category Frequency Settings': { te: 'కేటగిరీ ఫ్రీక్వెన్సీ సెట్టింగ్‌లు', hi: 'श्रेणी अंतराल सेटिंग' },
+      'Change My Password': { te: 'నా పాస్‌వర్డ్ మార్చండి', hi: 'मेरा पासवर्ड बदलें' },
+      'Clear Drafts': { te: 'డ్రాఫ్ట్‌లను తొలగించండి', hi: 'ड्राफ़्ट साफ़ करें' },
+      'Clear Notice': { te: 'నోటీసును తొలగించండి', hi: 'सूचना हटाएँ' },
+      'Clear Tag': { te: 'ట్యాగ్ తొలగించండి', hi: 'टैग हटाएँ' },
+      'Completed Work Progress': { te: 'పూర్తి చేసిన పనుల ప్రగతి', hi: 'पूरे किए गए काम की प्रगति' },
+      'Confirm new password': { te: 'కొత్త పాస్‌వర్డ్‌ను నిర్ధారించండి', hi: 'नया पासवर्ड दोबारा दर्ज करें' },
+      'Continue an unfinished report from the sheet.': { te: 'షీట్‌లోని పూర్తి కాని రిపోర్టును కొనసాగించండి.', hi: 'शीट में अधूरी रिपोर्ट जारी रखें।' },
+      'Contractor': { te: 'కాంట్రాక్టర్', hi: 'ठेकेदार' },
+      'Create a report, save progress, or reopen a submitted report.': { te: 'రిపోర్టు సృష్టించండి, పురోగతిని సేవ్ చేయండి లేదా సమర్పించిన రిపోర్టును తిరిగి తెరవండి.', hi: 'रिपोर्ट बनाएँ, प्रगति सहेजें या जमा की गई रिपोर्ट फिर खोलें।' },
+      'Create Asset': { te: 'ఆస్తిని సృష్టించండి', hi: 'एसेट बनाएँ' },
+      'Create New Asset': { te: 'కొత్త ఆస్తిని సృష్టించండి', hi: 'नया एसेट बनाएँ' },
+      'Current password': { te: 'ప్రస్తుత పాస్‌వర్డ్', hi: 'वर्तमान पासवर्ड' },
+      'Custom': { te: 'కస్టమ్', hi: 'कस्टम' },
+      'Custom Map PNG Icons': { te: 'కస్టమ్ మ్యాప్ PNG ఐకాన్లు', hi: 'कस्टम मैप PNG आइकन' },
+      'Customer Service Status': { te: 'కస్టమర్ సర్వీస్ స్థితి', hi: 'ग्राहक सेवा स्थिति' },
+      'Date': { te: 'తేదీ', hi: 'तारीख' },
+      'Date *': { te: 'తేదీ *', hi: 'तारीख *' },
+      'Delete Asset?': { te: 'ఆస్తిని తొలగించాలా?', hi: 'एसेट हटाएँ?' },
+      'Department': { te: 'విభాగం', hi: 'विभाग' },
+      'Done': { te: 'పూర్తయింది', hi: 'हो गया' },
+      'Download CSV': { te: 'CSV డౌన్‌లోడ్ చేయండి', hi: 'CSV डाउनलोड करें' },
+      'Download Full JSON Backup': { te: 'పూర్తి JSON బ్యాకప్ డౌన్‌లోడ్ చేయండి', hi: 'पूरा JSON बैकअप डाउनलोड करें' },
+      'Drafts save automatically on this device and to the LPT sheet.': { te: 'డ్రాఫ్ట్‌లు ఈ పరికరంలో మరియు LPT షీట్‌లో ఆటోమేటిక్‌గా సేవ్ అవుతాయి.', hi: 'ड्राफ़्ट इस डिवाइस और LPT शीट में अपने आप सहेजे जाते हैं।' },
+      'Drive Photos': { te: 'డ్రైవ్ ఫోటోలు', hi: 'ड्राइव फोटो' },
+      'Export Assets Table (CSV)': { te: 'ఆస్తుల పట్టికను CSVగా ఎగుమతి చేయండి', hi: 'एसेट तालिका CSV में निर्यात करें' },
+      'Feeder / Section under LPT *': { te: 'LPT కింద ఫీడర్ / సెక్షన్ *', hi: 'LPT के अंतर्गत फीडर / सेक्शन *' },
+      'Filter completed jobs by date range (DD-MM-YYYY)': { te: 'తేదీ పరిధి ప్రకారం పూర్తయిన పనులను ఫిల్టర్ చేయండి (DD-MM-YYYY)', hi: 'तारीख सीमा से पूरे काम फ़िल्टर करें (DD-MM-YYYY)' },
+      'Final Lock Pressure': { te: 'చివరి లాక్ ప్రెషర్', hi: 'अंतिम लॉक प्रेशर' },
+      'For this beta browser only': { te: 'ఈ బీటా బ్రౌజర్‌లో మాత్రమే', hi: 'केवल इस बीटा ब्राउज़र के लिए' },
+      'Frequency (Days)': { te: 'ఫ్రీక్వెన్సీ (రోజులు)', hi: 'अंतराल (दिन)' },
+      'Import KMZ or CSV': { te: 'KMZ లేదా CSV దిగుమతి చేయండి', hi: 'KMZ या CSV आयात करें' },
+      'Inactive (Maintenance Hold)': { te: 'ఇన్‌యాక్టివ్ (మెయింటెనెన్స్ నిలిపివేత)', hi: 'निष्क्रिय (रखरखाव रोका गया)' },
+      'Initial Lock Pressure': { te: 'ప్రారంభ లాక్ ప్రెషర్', hi: 'शुरुआती लॉक प्रेशर' },
+      'Latitude': { te: 'అక్షాంశం', hi: 'अक्षांश' },
+      'Loading drafts…': { te: 'డ్రాఫ్ట్‌లు లోడ్ అవుతున్నాయి…', hi: 'ड्राफ़्ट लोड हो रहे हैं…' },
+      'Loading DRS names…': { te: 'DRS పేర్లు లోడ్ అవుతున్నాయి…', hi: 'DRS नाम लोड हो रहे हैं…' },
+      'Loading reports…': { te: 'రిపోర్టులు లోడ్ అవుతున్నాయి…', hi: 'रिपोर्ट लोड हो रही हैं…' },
+      'Location *': { te: 'స్థలం *', hi: 'लोकेशन *' },
+      'Location / Landmark': { te: 'స్థలం / ల్యాండ్‌మార్క్', hi: 'लोकेशन / लैंडमार्क' },
+      'Location / Landmark *': { te: 'స్థలం / ల్యాండ్‌మార్క్ *', hi: 'लोकेशन / लैंडमार्क *' },
+      'Lock Pressure & Readings': { te: 'లాక్ ప్రెషర్ & రీడింగ్‌లు', hi: 'लॉक प्रेशर और रीडिंग' },
+      'LPT Duration': { te: 'LPT వ్యవధి', hi: 'LPT अवधि' },
+      'New LPT Report': { te: 'కొత్త LPT రిపోర్టు', hi: 'नई LPT रिपोर्ट' },
+      'New password (at least 6 characters)': { te: 'కొత్త పాస్‌వర్డ్ (కనీసం 6 అక్షరాలు)', hi: 'नया पासवर्ड (कम से कम 6 अक्षर)' },
+      'Notice: Once maintenance is completed, this assignment tag will automatically clear.': { te: 'గమనిక: మెయింటెనెన్స్ పూర్తయిన తర్వాత ఈ అసైన్‌మెంట్ ట్యాగ్ ఆటోమేటిక్‌గా తొలగుతుంది.', hi: 'सूचना: रखरखाव पूरा होने पर यह असाइनमेंट टैग अपने आप हट जाएगा।' },
+      'Observation': { te: 'పరిశీలన', hi: 'निरीक्षण' },
+      'Observation & Verification': { te: 'పరిశీలన & ధృవీకరణ', hi: 'निरीक्षण और सत्यापन' },
+      'Open a report to review or edit it. Submitting an edit updates its report number.': { te: 'సమీక్షించడానికి లేదా సవరించడానికి రిపోర్టును తెరవండి. సవరణ సమర్పిస్తే రిపోర్టు నంబర్ అప్‌డేట్ అవుతుంది.', hi: 'रिपोर्ट देखने या संपादित करने के लिए खोलें। संपादन जमा करने पर रिपोर्ट नंबर अपडेट होगा।' },
+      'Other Maintenance — Lock Pressure Test': { te: 'ఇతర మెయింటెనెన్స్ — లాక్ ప్రెషర్ టెస్ట్', hi: 'अन्य रखरखाव — लॉक प्रेशर टेस्ट' },
+      'Photo preview': { te: 'ఫోటో ప్రివ్యూ', hi: 'फोटो पूर्वावलोकन' },
+      'Pipeline Length': { te: 'పైప్‌లైన్ పొడవు', hi: 'पाइपलाइन की लंबाई' },
+      'Prepared By': { te: 'తయారు చేసినవారు', hi: 'तैयार करने वाला' },
+      'Pressure Drop (Auto)': { te: 'ప్రెషర్ డ్రాప్ (ఆటో)', hi: 'प्रेशर ड्रॉप (ऑटो)' },
+      'Pressure Unit': { te: 'ప్రెషర్ యూనిట్', hi: 'प्रेशर इकाई' },
+      'Publish Notice': { te: 'నోటీసు ప్రచురించండి', hi: 'सूचना प्रकाशित करें' },
+      'Reading Frequency': { te: 'రీడింగ్ ఫ్రీక్వెన్సీ', hi: 'रीडिंग अंतराल' },
+      'Report / Form No.': { te: 'రిపోర్టు / ఫారం నం.', hi: 'रिपोर्ट / फ़ॉर्म नंबर' },
+      'Report Form': { te: 'రిపోర్టు ఫారం', hi: 'रिपोर्ट फ़ॉर्म' },
+      'Reset Defaults': { te: 'డిఫాల్ట్‌లకు రీసెట్ చేయండి', hi: 'डिफ़ॉल्ट रीसेट करें' },
+      'Role': { te: 'పాత్ర', hi: 'भूमिका' },
+      'Save Account': { te: 'ఖాతా సేవ్ చేయండి', hi: 'खाता सहेजें' },
+      'Save Changes': { te: 'మార్పులు సేవ్ చేయండి', hi: 'बदलाव सहेजें' },
+      'Save Draft': { te: 'డ్రాఫ్ట్ సేవ్ చేయండి', hi: 'ड्राफ़्ट सहेजें' },
+      'Save Password': { te: 'పాస్‌వర్డ్ సేవ్ చేయండి', hi: 'पासवर्ड सहेजें' },
+      'Save Team': { te: 'టీమ్ సేవ్ చేయండి', hi: 'टीम सहेजें' },
+      'Saved Drafts': { te: 'సేవ్ చేసిన డ్రాఫ్ట్‌లు', hi: 'सहेजे गए ड्राफ़्ट' },
+      'Section / SR Details': { te: 'సెక్షన్ / SR వివరాలు', hi: 'सेक्शन / SR विवरण' },
+      'Select New Team': { te: 'కొత్త టీమ్ ఎంచుకోండి', hi: 'नई टीम चुनें' },
+      'Select Technician': { te: 'టెక్నీషియన్‌ను ఎంచుకోండి', hi: 'तकनीशियन चुनें' },
+      'Send reminder to': { te: 'రిమైండర్ పంపండి:', hi: 'रिमाइंडर भेजें:' },
+      'Set maintenance intervals (in days) and batch apply to all assets in that category:': { te: 'మెయింటెనెన్స్ వ్యవధిని (రోజుల్లో) సెట్ చేసి ఆ కేటగిరీలోని అన్ని ఆస్తులకు వర్తింపజేయండి:', hi: 'रखरखाव अंतराल (दिनों में) सेट करें और उस श्रेणी के सभी एसेट पर लागू करें:' },
+      'Showing assets for your team': { te: 'మీ టీమ్ ఆస్తులు చూపిస్తున్నాయి', hi: 'आपकी टीम के एसेट दिखाए जा रहे हैं' },
+      'Start a report. Your work is saved on this device while you fill it in.': { te: 'రిపోర్టు ప్రారంభించండి. నింపుతున్నప్పుడు మీ పని ఈ పరికరంలో సేవ్ అవుతుంది.', hi: 'रिपोर्ट शुरू करें। भरते समय आपका काम इस डिवाइस में सहेजा जाएगा।' },
+      'Submit & Generate PDF': { te: 'సమర్పించి PDF తయారు చేయండి', hi: 'जमा करें और PDF बनाएँ' },
+      'Submitted Reports': { te: 'సమర్పించిన రిపోర్టులు', hi: 'जमा की गई रिपोर्ट' },
+      'Sync All Assets to Google Sheet': { te: 'అన్ని ఆస్తులను Google Sheet‌కు సింక్ చేయండి', hi: 'सभी एसेट Google Sheet से सिंक करें' },
+      'Syncing Assets with Cloud...': { te: 'ఆస్తులు క్లౌడ్‌తో సింక్ అవుతున్నాయి...', hi: 'एसेट क्लाउड से सिंक हो रहे हैं...' },
+      'Tap row to copy': { te: 'కాపీ చేయడానికి వరుసను నొక్కండి', hi: 'कॉपी करने के लिए पंक्ति टैप करें' },
+      'Team *': { te: 'టీమ్ *', hi: 'टीम *' },
+      'Technician Reminder': { te: 'టెక్నీషియన్ రిమైండర్', hi: 'तकनीशियन रिमाइंडर' },
+      'Test Start / Valve Closing *': { te: 'టెస్ట్ ప్రారంభం / వాల్వ్ క్లోజింగ్ *', hi: 'टेस्ट शुरू / वाल्व बंद *' },
+      'Test Timing': { te: 'టెస్ట్ సమయం', hi: 'टेस्ट का समय' },
+      'This asset will instantly be transferred to the selected team\'s zone and field roster.': { te: 'ఈ ఆస్తి ఎంచుకున్న టీమ్ జోన్ మరియు ఫీల్డ్ జాబితాకు వెంటనే బదిలీ అవుతుంది.', hi: 'यह एसेट तुरंत चुनी गई टीम के ज़ोन और फील्ड सूची में स्थानांतरित होगा।' },
+      'Total Readings': { te: 'మొత్తం రీడింగ్‌లు', hi: 'कुल रीडिंग' },
+      'Total Test Time': { te: 'మొత్తం టెస్ట్ సమయం', hi: 'कुल टेस्ट समय' },
+      'Type *': { te: 'రకం *', hi: 'प्रकार *' },
+      'Upload custom PNG icons to display on the GIS map for each category': { te: 'ప్రతి కేటగిరీకి GIS మ్యాప్‌లో చూపించడానికి కస్టమ్ PNG ఐకాన్లు అప్‌లోడ్ చేయండి', hi: 'हर श्रेणी के लिए GIS मैप पर दिखाने हेतु कस्टम PNG आइकन अपलोड करें' },
+      'Valve Opening (Auto)': { te: 'వాల్వ్ ఓపెనింగ్ (ఆటో)', hi: 'वाल्व खुलना (ऑटो)' },
+      'Verified By': { te: 'ధృవీకరించినవారు', hi: 'सत्यापित करने वाला' },
+      'Asset Data': { te: 'ఆస్తి డేటా', hi: 'एसेट डेटा' },
+      'Admin Asset Database': { te: 'అడ్మిన్ ఆస్తి డేటాబేస్', hi: 'एडमिन एसेट डेटाबेस' },
+      'Admin-only customer and equipment database': { te: 'అడ్మిన్‌లకు మాత్రమే కస్టమర్ మరియు పరికరాల డేటాబేస్', hi: 'केवल एडमिन के लिए ग्राहक और उपकरण डेटाबेस' },
+      'Customer and equipment details are available to admins only.': { te: 'కస్టమర్ మరియు పరికరాల వివరాలు అడ్మిన్‌లకు మాత్రమే అందుబాటులో ఉంటాయి.', hi: 'ग्राहक और उपकरण विवरण केवल एडमिन देख सकते हैं।' },
+      'Import or update the Excel master': { te: 'Excel మాస్టర్‌ను దిగుమతి చేయండి లేదా అప్‌డేట్ చేయండి', hi: 'Excel मास्टर आयात या अपडेट करें' },
+      'Search customer, ID, meter, DRS or valve...': { te: 'కస్టమర్, ఐడి, మీటర్, DRS లేదా వాల్వ్ కోసం వెతకండి...', hi: 'ग्राहक, आईडी, मीटर, DRS या वाल्व खोजें...' },
+      'View Full Details & History': { te: 'పూర్తి వివరాలు & చరిత్ర చూడండి', hi: 'पूरा विवरण और इतिहास देखें' },
+      'Complete Activity History': { te: 'పూర్తి కార్యకలాపాల చరిత్ర', hi: 'पूरी गतिविधि का इतिहास' },
+      'Select activity': { te: 'కార్యకలాపాన్ని ఎంచుకోండి', hi: 'गतिविधि चुनें' },
+      'Component (optional)': { te: 'కాంపోనెంట్ (ఐచ్ఛికం)', hi: 'कंपोनेंट (वैकल्पिक)' },
+      'Previous value (optional)': { te: 'మునుపటి విలువ (ఐచ్ఛికం)', hi: 'पिछला मान (वैकल्पिक)' },
+      'New value (optional)': { te: 'కొత్త విలువ (ఐచ్ఛికం)', hi: 'नया मान (वैकल्पिक)' },
+      'Details / remarks': { te: 'వివరాలు / వ్యాఖ్యలు', hi: 'विवरण / टिप्पणियाँ' },
+      'Add Activity to History': { te: 'చరిత్రకు కార్యకలాపం జోడించండి', hi: 'इतिहास में गतिविधि जोड़ें' },
+      'Import Excel to Admin Database': { te: 'Excel‌ను అడ్మిన్ డేటాబేస్‌లోకి దిగుమతి చేయండి', hi: 'Excel को एडमिन डेटाबेस में आयात करें' },
+      'ROW': { te: 'వరుస', hi: 'पंक्ति' },
+      'Reconnection / Activation': { te: 'రీకనెక్షన్ / యాక్టివేషన్', hi: 'पुनः कनेक्शन / सक्रियण' },
+      'Temporary Disconnection (TD)': { te: 'తాత్కాలిక డిస్‌కనెక్షన్ (TD)', hi: 'अस्थायी डिस्कनेक्शन (TD)' },
+      'Permanent Disconnection (PD)': { te: 'శాశ్వత డిస్‌కనెక్షన్ (PD)', hi: 'स्थायी डिस्कनेक्शन (PD)' },
+      'Meter Change': { te: 'మీటర్ మార్పు', hi: 'मीटर बदलाव' },
+      'Regulator Change': { te: 'రెగ్యులేటర్ మార్పు', hi: 'रेगुलेटर बदलाव' },
+      'EVC Change': { te: 'EVC మార్పు', hi: 'EVC बदलाव' },
+      'CRV Change': { te: 'CRV మార్పు', hi: 'CRV बदलाव' },
+      'Gauge Change': { te: 'గేజ్ మార్పు', hi: 'गेज बदलाव' },
+      'Filter Change': { te: 'ఫిల్టర్ మార్పు', hi: 'फ़िल्टर बदलाव' },
+      'Skid Change': { te: 'స్కిడ్ మార్పు', hi: 'स्किड बदलाव' }
+    };
+    const languageNames = { en: 'English', te: 'తెలుగు', hi: 'हिन्दी' };
+    const originalTextNodes = new WeakMap();
+    const lastTranslatedText = new WeakMap();
+    const originalAttributes = new WeakMap();
+    let interfaceLanguage = 'en';
+    let translationScheduled = false;
+
+    function translateValue(value, language) {
+      const key = String(value || '').replace(/\s+/g, ' ').trim();
+      if (language === 'en' || !UI_TRANSLATIONS[key]) return value;
+      const translated = UI_TRANSLATIONS[key][language];
+      if (!translated) return value;
+      const leading = String(value).match(/^\s*/)?.[0] || '';
+      const trailing = String(value).match(/\s*$/)?.[0] || '';
+      return leading + translated + trailing;
+    }
+
+    function translatePage(language = interfaceLanguage) {
+      interfaceLanguage = languageNames[language] ? language : 'en';
+      document.documentElement.lang = interfaceLanguage;
+      const label = document.getElementById('currentLanguageLabel');
+      if (label) label.textContent = languageNames[interfaceLanguage];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const parentTag = node.parentElement?.tagName;
+        if (parentTag === 'SCRIPT' || parentTag === 'STYLE' || parentTag === 'TEXTAREA' || node.parentElement?.id === 'currentLanguageLabel') continue;
+        const current = node.nodeValue;
+        let original = originalTextNodes.get(node);
+        if (original === undefined || (current !== lastTranslatedText.get(node) && current !== original)) {
+          original = current;
+          originalTextNodes.set(node, original);
+        }
+        const translated = translateValue(original, interfaceLanguage);
+        if (current !== translated) node.nodeValue = translated;
+        lastTranslatedText.set(node, translated);
+      }
+
+      document.querySelectorAll('[placeholder],[title],[aria-label]').forEach(element => {
+        let saved = originalAttributes.get(element);
+        if (!saved) { saved = {}; originalAttributes.set(element, saved); }
+        ['placeholder', 'title', 'aria-label'].forEach(attribute => {
+          if (!element.hasAttribute(attribute)) return;
+          const current = element.getAttribute(attribute);
+          if (saved[attribute] === undefined || (current !== saved[attribute].last && current !== saved[attribute].original)) {
+            saved[attribute] = { original: current, last: current };
+          }
+          const translated = translateValue(saved[attribute].original, interfaceLanguage);
+          element.setAttribute(attribute, translated);
+          saved[attribute].last = translated;
+        });
+      });
+    }
+
+    function toggleLanguageMenu() {
+      const menu = document.getElementById('languageMenu');
+      const button = document.getElementById('languageButton');
+      const opening = menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', !opening);
+      button.setAttribute('aria-expanded', String(opening));
+    }
+
+    function setInterfaceLanguage(language) {
+      interfaceLanguage = languageNames[language] ? language : 'en';
+      safeStore.set('bgl_beta_language', interfaceLanguage);
+      translatePage(interfaceLanguage);
+      document.getElementById('languageMenu').classList.add('hidden');
+      document.getElementById('languageButton').setAttribute('aria-expanded', 'false');
+    }
+
+    document.addEventListener('click', event => {
+      const selector = document.getElementById('languageSelector');
+      if (selector && !selector.contains(event.target)) {
+        document.getElementById('languageMenu').classList.add('hidden');
+        document.getElementById('languageButton').setAttribute('aria-expanded', 'false');
+      }
+    });
+    const translationObserver = new MutationObserver(() => {
+      if (translationScheduled) return;
+      translationScheduled = true;
+      requestAnimationFrame(() => { translationScheduled = false; translatePage(interfaceLanguage); });
+    });
+    translationObserver.observe(document.body, { childList: true, characterData: true, subtree: true });
+    setInterfaceLanguage(safeStore.get('bgl_beta_language') || 'en');
   </script>
 </body>
 </html>
