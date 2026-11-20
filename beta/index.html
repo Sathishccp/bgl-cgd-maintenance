@@ -1037,7 +1037,7 @@
 
     async function handleCore(url, init) {
       const method = String(init?.method || (typeof input !== 'undefined' && input?.method) || 'GET').toUpperCase();
-      const state = coreState();
+      let state = coreState();
       state.users = Array.isArray(state.users) ? state.users : [];
       state.passwordOverrides = state.passwordOverrides || {};
       state.liveUserIds = state.liveUserIds || [];
@@ -1097,7 +1097,7 @@
           state={...state,initialized:true,assets:Array.isArray(remote.assets)?remote.assets:[],logs:Array.isArray(remote.logs)?remote.logs:[],notices:Array.isArray(remote.notices)?remote.notices:[],icons:Array.isArray(remote.icons)?remote.icons:[],iconsInitialized:remote.iconsInitialized!==false,users:[],passwordOverrides:state.passwordOverrides||{},liveUsers:(remote.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})),liveUserIds:(remote.users||[]).map(u=>String(u.id||'').trim().toUpperCase())};
           write(STATE_KEY,state);
         }
-        if (remote.status==='success') { const publicUsers=(remote.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); const betaUsers=(state.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); return jsonResponse({...remote,assets:state.assets,logs:state.logs,notices:state.notices,icons:state.icons,iconsInitialized:state.iconsInitialized,users:[...publicUsers,...betaUsers]}); }
+        if (remote.status==='success') { state.adminDatabases=state.adminDatabases||{}; state.assets=(state.assets||[]).map(asset=>({...asset,registrationNo:asset.registrationNo||'',mjcNo:asset.mjcNo||'',mjcDate:asset.mjcDate||''})); write(STATE_KEY,state); const publicUsers=(remote.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); const betaUsers=(state.users||[]).map(u=>({id:u.id,name:u.name,team:u.team||'',role:u.role||'tech'})); return jsonResponse({...remote,assets:state.assets,logs:state.logs,notices:state.notices,icons:state.icons,iconsInitialized:state.iconsInitialized,users:[...publicUsers,...betaUsers]}); }
         return response;
       }
       if (action==='getNotices') return jsonResponse({status:'success',notices:state.notices});
