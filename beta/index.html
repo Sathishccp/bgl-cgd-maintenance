@@ -421,7 +421,7 @@
         <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
           <div>
             <h2 class="text-base font-bold text-white"><i class="fa-solid fa-users text-emerald-300 mr-1.5"></i>IPNG / CPNG Customer Data</h2>
-            <p class="text-xs text-slate-400 mt-1">Customer records are visible to admins only. Upload the Excel master the first time; later imports replace only this customer database.</p>
+            <p class="text-xs text-slate-400 mt-1">Customer records are visible to admins only. Upload the Excel master or create a single customer and linked Asset.</p>
             <p class="text-xs text-teal-300 mt-2">Google Sheet destination: <b>BGL_Gas_Master_DB</b> → <code>AdminIPNGCPNGDatabase</code></p>
           </div>
           <div class="flex flex-col sm:flex-row gap-2 sm:items-center w-full lg:max-w-2xl">
@@ -429,8 +429,9 @@
             <button id="adminAssetImportButton" type="button" disabled onclick="importAdminAssetWorkbook()" class="px-3 py-2 rounded-lg bg-emerald-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">Upload Customer Excel</button>
           </div>
         </div>
+        <div class="flex justify-end mt-2"><button type="button" onclick="openSingleCustomerModal()" class="px-3 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-semibold"><i class="fa-solid fa-user-plus mr-1"></i>Create Single Customer + Asset</button></div>
         <p id="adminAssetImportSummary" class="text-slate-300 mt-2"></p>
-        <p id="adminAssetMasterStatus" class="text-amber-300 mt-1"></p>
+        <p id="adminAssetMasterStatus" class="text-amber-300 mt-1">Upload an Excel master or create a customer individually.</p>
       </div>
       <div class="glass-card rounded-2xl border border-slate-800 p-3 sm:p-4">
         <div class="flex flex-col sm:flex-row gap-2 sm:items-center justify-between mb-3">
@@ -443,6 +444,30 @@
   </div>
 
   <!-- ==================== 3. MODALS ==================== -->
+
+  <div id="singleCustomerModal" class="hidden fixed inset-0 z-[75] bg-black/85 flex items-center justify-center p-2 sm:p-4">
+    <div class="glass-card w-full max-w-4xl p-4 sm:p-5 rounded-2xl max-h-[96vh] overflow-y-auto border border-slate-700 text-xs">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-3 mb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-user-plus text-teal-300 mr-1"></i>Create One IPNG / CPNG Customer</h3><p class="text-slate-400 mt-1">Creates the customer record and linked Asset together. Next maintenance is calculated from MJC date + frequency.</p></div><button type="button" onclick="closeModal('singleCustomerModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark fa-lg"></i></button></div>
+      <form id="singleCustomerForm" onsubmit="createSingleCustomer(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <label class="text-slate-400">Registration No. *<input id="singleCustomerRegNo" required maxlength="100" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Customer ID<input id="singleCustomerId" maxlength="100" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400 sm:col-span-2">Customer Name *<input id="singleCustomerName" required maxlength="250" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Customer Type *<select id="singleCustomerType" required class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"><option>IPNG</option><option>CPNG</option></select></label>
+        <label class="text-slate-400">Contact No.<input id="singleCustomerContact" inputmode="tel" maxlength="40" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Location / Area *<input id="singleCustomerLocation" required maxlength="250" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400 sm:col-span-2">Registered Address *<input id="singleCustomerAddress" required maxlength="500" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">MJC No. *<input id="singleCustomerMJCNo" required maxlength="100" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">MJC Date *<input id="singleCustomerMJCDate" type="date" required class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Asset ID *<input id="singleCustomerAssetId" required maxlength="100" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white font-mono uppercase"></label>
+        <label class="text-slate-400">Asset Type *<select id="singleCustomerAssetType" onchange="updateSingleCustomerFrequency()" required class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"><option>SR</option><option>DRS</option><option>MRS</option><option>Diaphragm meter</option><option>MDPE Valve</option><option>SV station</option></select></label>
+        <label class="text-slate-400">Team *<select id="singleCustomerTeam" required class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></select></label>
+        <label class="text-slate-400">Maintenance Frequency (Days) *<input id="singleCustomerFreq" type="number" min="1" value="90" required class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Latitude<input id="singleCustomerLat" type="number" step="any" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Longitude<input id="singleCustomerLng" type="number" step="any" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <div class="sm:col-span-2 lg:col-span-4 flex items-center justify-between gap-3 border-t border-slate-800 pt-3"><p id="singleCustomerStatus" class="text-amber-300"></p><div class="flex gap-2"><button type="button" onclick="closeModal('singleCustomerModal')" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300">Cancel</button><button id="singleCustomerSubmit" type="submit" class="px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-semibold"><i class="fa-solid fa-check mr-1"></i>Create Customer + Asset</button></div></div>
+      </form>
+    </div>
+  </div>
 
   <!-- Staff Logins & Password Modal -->
   <div id="teamManageModal" class="hidden fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3">
@@ -738,6 +763,10 @@
         <button onclick="closeModal('adminAssetDetailModal')" class="text-slate-400 hover:text-white p-1" aria-label="Close record details"><i class="fa-solid fa-xmark fa-lg"></i></button>
       </div>
       <div id="adminAssetDetailGroups" class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4"></div>
+      <section id="ipngCustomerHistorySection" class="hidden border-t border-slate-800 pt-3 mb-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div><h4 class="font-bold text-white"><i class="fa-solid fa-clock-rotate-left text-teal-300 mr-1"></i>Customer Maintenance & Equipment History</h4><p class="text-slate-400 mt-1">Technician-submitted equipment changes wait here for admin review.</p></div><button type="button" onclick="openIPNGActivityModal('', selectedAdminAssetRecord?.recordId)" class="px-3 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-semibold"><i class="fa-solid fa-plus mr-1"></i>Add Activity</button></div>
+        <div id="ipngCustomerHistoryList" class="space-y-2"></div>
+      </section>
       <section id="registrationLinkSection" class="hidden border-t border-slate-800 pt-3 mb-4">
         <h4 class="font-bold text-white mb-1"><i class="fa-solid fa-link text-cyan-300 mr-1"></i> Link Existing Asset by Registration No.</h4>
         <p class="text-slate-400 mb-3">Use this for assets already in service. It links the customer and Asset without changing its maintenance dates.</p>
@@ -788,6 +817,24 @@
         </form>
         <div id="adminAssetActivityList" class="space-y-2"></div>
       </section>
+    </div>
+  </div>
+
+  <div id="ipngActivityModal" class="hidden fixed inset-0 z-[85] bg-black/85 flex items-center justify-center p-3">
+    <div class="glass-card w-full max-w-2xl p-4 sm:p-5 rounded-2xl max-h-[94vh] overflow-y-auto border border-slate-700 text-xs">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-3 mb-3"><div><h3 class="text-base font-bold text-white"><i class="fa-solid fa-screwdriver-wrench text-amber-300 mr-1"></i>IPNG / CPNG Service Activity</h3><p id="ipngActivitySubtitle" class="text-slate-400 mt-1"></p></div><button type="button" onclick="closeModal('ipngActivityModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark fa-lg"></i></button></div>
+      <form id="ipngActivityForm" onsubmit="submitIPNGActivity(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <label class="text-slate-400">Asset ID<input id="ipngActivityAssetId" readonly class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-400"></label>
+        <label class="text-slate-400">Registration No.<input id="ipngActivityRegNo" readonly class="mt-1 w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-400"></label>
+        <label class="text-slate-400">Activity *<select id="ipngActivityType" required class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"><option value="">Select activity</option><option>Meter Problem / Inspection</option><option>Meter Change</option><option>Regulator Change</option><option>MRS Equipment Change</option><option>EVC Change</option><option>CRV Change</option><option>Filter Change</option><option>Gauge Change</option><option>Skid Change</option><option>Repair / Service</option><option>Other</option></select></label>
+        <label class="text-slate-400">Activity Date *<input id="ipngActivityDate" type="date" required class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label id="ipngActivityTechWrap" class="text-slate-400">Technician Name *<input id="ipngActivityTechnician" required maxlength="160" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Component / Equipment<input id="ipngActivityComponent" maxlength="160" placeholder="Meter, regulator, EVC, CRV, filter…" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">Old equipment / serial no.<input id="ipngActivityPrevious" maxlength="250" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400">New equipment / serial no.<input id="ipngActivityNew" maxlength="250" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></label>
+        <label class="text-slate-400 sm:col-span-2">Work details / remarks<textarea id="ipngActivityRemarks" rows="3" maxlength="2000" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white"></textarea></label>
+        <div class="sm:col-span-2 flex items-center justify-between gap-3 border-t border-slate-800 pt-3"><p id="ipngActivityStatus" class="text-amber-300"></p><div class="flex gap-2"><button type="button" onclick="closeModal('ipngActivityModal')" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-300">Cancel</button><button id="ipngActivitySubmit" type="submit" class="px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-semibold">Submit Activity</button></div></div>
+      </form>
     </div>
   </div>
 
@@ -1072,6 +1119,8 @@
         else if (body.action === 'getAdminAssetMaster') { const dataset=String(body.datasetType||'assets'); const db=(state.adminDatabases||{})[dataset]||{columns:[],records:[],activities:[]}; return jsonResponse({status:'success',datasetType:dataset,columns:db.columns||[],records:db.records||[],activities:db.activities||[]}); }
         else if (body.action === 'syncAdminAssetMaster') { const dataset=String(body.datasetType||'assets'); if(!['assets','maintenance','ipng_cpng'].includes(dataset)) result={status:'error',message:'Invalid beta database'}; else { state.adminDatabases=state.adminDatabases||{}; const old=state.adminDatabases[dataset]||{}; state.adminDatabases[dataset]={columns:Array.isArray(body.columns)?body.columns:[],records:Array.isArray(body.records)?body.records:[],activities:old.activities||[]}; result={status:'success',datasetType:dataset,recordsImported:state.adminDatabases[dataset].records.length}; } }
         else if (body.action === 'addAdminAssetActivity') { const dataset='assets'; state.adminDatabases=state.adminDatabases||{}; const db=state.adminDatabases[dataset]||{columns:[],records:[],activities:[]}; db.activities=db.activities||[]; db.activities.push({activityId:'BETA-ACT-'+Date.now(),recordId:body.recordId,activityType:body.activityType,activityDate:body.activityDate,component:body.component||'',previousValue:body.previousValue||'',newValue:body.newValue||'',performedBy:'Beta admin',remarks:body.remarks||'',createdAt:new Date().toISOString()}); state.adminDatabases[dataset]=db; result={status:'success'}; }
+        else if (body.action === 'saveIPNGActivity') { state.adminDatabases=state.adminDatabases||{}; const db=state.adminDatabases.ipng_cpng||{columns:[],records:[],activities:[]}; db.activities=db.activities||[]; const activity=body.activity||{}; if(!activity.activityId || db.activities.some(item=>item.activityId===activity.activityId)) result={status:'error',message:'Activity record is missing or duplicated'}; else { db.activities.push(activity); state.adminDatabases.ipng_cpng=db; result={status:'success',activityId:activity.activityId,approvalStatus:activity.approvalStatus}; } }
+        else if (body.action === 'reviewIPNGActivity') { const db=(state.adminDatabases||{}).ipng_cpng; const item=db?.activities?.find(activity=>activity.activityId===body.activityId); if(!item) result={status:'error',message:'Activity record not found'}; else { item.approvalStatus=body.approvalStatus==='Approved'?'Approved':'Rejected'; item.reviewedBy=body.reviewedBy||''; item.reviewedAt=new Date().toISOString(); result={status:'success',approvalStatus:item.approvalStatus}; } }
         else if (body.action === 'addUser') {
           const id=String(body.id||'').trim().toUpperCase();
           if (!id || [...state.users].some(u=>String(u.id||'').trim().toUpperCase()===id) || (state.liveUserIds||[]).includes(id)) result={status:'error',message:'A beta account with this ID already exists'};
@@ -1204,6 +1253,7 @@
     let pendingAdminAssetImport = null;
     let selectedAdminAssetRecord = null;
     let selectedAdminDataset = 'assets';
+    let activeIPNGActivityContext = null;
     let assets = [];
     let maintenanceHistory = [];
     let cloudNotices = [];
@@ -2058,6 +2108,7 @@
           <td class="p-2.5"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${info.badge}">${info.status}</span></td>
           <td class="p-2.5 text-right whitespace-nowrap">
             <div class="flex items-center justify-end gap-1">
+              ${asset.registrationNo ? `<button onclick="openIPNGActivityModal('${asset.id}')" title="Record IPNG / CPNG equipment activity" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700"><i class="fa-solid fa-screwdriver-wrench"></i></button>` : ''}
               ${currentUser && currentUser.role === 'admin' ? `
                 <button onclick="openAssignTeamModal('${asset.id}')" title="Assign to Team" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700">
                   <i class="fa-solid fa-people-group"></i>
@@ -2822,6 +2873,113 @@
       return next;
     }
 
+    function ensureCustomerField(columns, record, label, key, pattern, value) {
+      let column = columns.find(item => pattern.test(String(item.label || '')));
+      const columnKey = column ? column.key : ensureAdminColumn(columns, label, key);
+      record[columnKey] = value == null ? '' : String(value);
+      return columnKey;
+    }
+
+    function openSingleCustomerModal() {
+      if (currentUser?.role !== 'admin') return showToast('Admin access required.');
+      const teamSelect = document.getElementById('singleCustomerTeam');
+      teamSelect.replaceChildren(...teams.map(team => new Option(team, team)));
+      document.getElementById('singleCustomerMJCDate').value = localDateKey();
+      const type = document.getElementById('singleCustomerAssetType').value;
+      document.getElementById('singleCustomerFreq').value = categoryFreqs[type] || 90;
+      document.getElementById('singleCustomerStatus').textContent = '';
+      openModal('singleCustomerModal');
+    }
+
+    function updateSingleCustomerFrequency() {
+      const type = document.getElementById('singleCustomerAssetType').value;
+      document.getElementById('singleCustomerFreq').value = categoryFreqs[type] || 90;
+    }
+
+    async function createSingleCustomer(event) {
+      event.preventDefault();
+      if (currentUser?.role !== 'admin') return showToast('Admin access required.');
+      const get = id => String(document.getElementById(id).value || '').trim();
+      const registrationNo = get('singleCustomerRegNo');
+      const customerId = get('singleCustomerId');
+      const customerName = get('singleCustomerName');
+      const customerType = get('singleCustomerType');
+      const contact = get('singleCustomerContact');
+      const area = get('singleCustomerLocation');
+      const address = get('singleCustomerAddress');
+      const mjcNo = get('singleCustomerMJCNo');
+      const mjcDate = get('singleCustomerMJCDate');
+      const assetId = get('singleCustomerAssetId').toUpperCase();
+      const type = get('singleCustomerAssetType');
+      const team = get('singleCustomerTeam');
+      const freqDays = Number(get('singleCustomerFreq'));
+      const lat = Number(get('singleCustomerLat'));
+      const lng = Number(get('singleCustomerLng'));
+      const status = document.getElementById('singleCustomerStatus');
+      const button = document.getElementById('singleCustomerSubmit');
+      const normalizedReg = sanitizeKey(registrationNo);
+      if (!registrationNo || !customerName || !area || !address || !mjcNo || !mjcDate || !assetId || !team || !freqDays) return showToast('Complete all required customer, MJC and Asset fields.');
+
+      button.disabled = true;
+      status.textContent = 'Creating the customer and linked Asset…';
+      const beforeAssets = assets;
+      let assetSynced = false;
+      try {
+        const result = await adminAssetApi('getAdminAssetMaster', { datasetType: 'ipng_cpng' });
+        const columns = Array.isArray(result.columns) ? result.columns.slice() : [];
+        const records = Array.isArray(result.records) ? result.records.slice() : [];
+        const regColumn = customerRegistrationColumn(columns);
+        const duplicateCustomer = regColumn && records.find(record => sanitizeKey(record[regColumn.key]) === normalizedReg);
+        if (duplicateCustomer) throw new Error('A customer with this Registration No. already exists. Open that record to update/link it.');
+        if (assets.some(asset => sanitizeKey(asset.registrationNo) === normalizedReg)) throw new Error('This Registration No. is already linked to an Asset. Use the existing customer link workflow.');
+        const duplicateAsset = assets.find(asset => sanitizeKey(asset.id) === sanitizeKey(assetId));
+        if (duplicateAsset) throw new Error(`Asset ID ${assetId} already exists. Enter a unique Asset ID.`);
+
+        const record = { recordId: `MJC-${adminColumnSlug(registrationNo).toUpperCase()}-${Date.now()}`, sourceRow: records.length + 2 };
+        ensureCustomerField(columns, record, 'Registration No.', 'registration_no', /\bregistration\s*(?:no\.?|number)|\breg\.?\s*(?:no\.?|number)\b/i, registrationNo);
+        ensureCustomerField(columns, record, 'Customer ID', 'customer_id', /\bcustomer\s*id\b/i, customerId);
+        ensureCustomerField(columns, record, 'Name Of The Customer', 'customer_name', /customer.*name|name.*customer/i, customerName);
+        ensureCustomerField(columns, record, 'Contact No.', 'contact_no', /contact|mobile|phone/i, contact);
+        ensureCustomerField(columns, record, 'Type Of Customer', 'customer_type', /type.*customer|customer.*type/i, customerType);
+        ensureCustomerField(columns, record, 'Location', 'location', /^location$/i, area);
+        ensureCustomerField(columns, record, 'Address (Registered)', 'address_registered', /registered.*address|address/i, address);
+        const googleLocation = Number.isFinite(lat) && Number.isFinite(lng) && get('singleCustomerLat') !== '' && get('singleCustomerLng') !== '' ? `${lat}, ${lng}` : '';
+        ensureCustomerField(columns, record, 'Google Location', 'google_location', /google\s*location|latitude.*longitude|coordinates/i, googleLocation);
+        ensureCustomerField(columns, record, 'Status (Running/TD/PD)', 'status_running_td_pd', /status.*running.*td.*pd|running.*td.*pd/i, 'Running');
+        ensureCustomerField(columns, record, 'MJC No. Date.', 'mjc_no_date', /\bMJC\b.*\b(?:No\.?|Number)\b.*\bDate\b/i, `${mjcNo} (${formatToDDMMYYYY(mjcDate)})`);
+        const separateMJCNo = columns.find(column => /\bMJC\s*(?:No\.?|Number)/i.test(String(column.label || '')) && !/date/i.test(String(column.label || '')));
+        if (separateMJCNo) record[separateMJCNo.key] = mjcNo;
+        const separateMJCDate = columns.find(column => /\bMJC\b.*\bDate\b|\bDate\b.*\bMJC\b/i.test(String(column.label || '')) && !/no[\s.]*date/i.test(String(column.label || '')));
+        if (separateMJCDate) record[separateMJCDate.key] = formatToDDMMYYYY(mjcDate);
+
+        const asset = { id: assetId, registrationNo, mjcNo, mjcDate, type, team, location: `${area}, ${address}`, lat: Number.isFinite(lat) && get('singleCustomerLat') !== '' ? lat : '', lng: Number.isFinite(lng) && get('singleCustomerLng') !== '' ? lng : '', freqDays, assignedTech: '', serviceStatus: 'Active', activationDate: mjcDate };
+        const nextAssets = deduplicateAssets([...assets, asset]);
+        assets = nextAssets;
+        assetSynced = await syncAssetsToCloud(false);
+        if (!assetSynced) { assets = beforeAssets; safeStore.set('bgl_assets_v2', JSON.stringify(assets)); throw new Error('Asset save failed. No customer row was created.'); }
+        status.textContent = 'Asset saved. Saving the customer record…';
+        records.push(record);
+        const dbResult = await adminAssetApi('syncAdminAssetMaster', { datasetType: 'ipng_cpng', columns, records });
+        adminAssetRecords = records;
+        adminAssetColumns = columns;
+        adminAssetActivities = Array.isArray(dbResult.activities) ? dbResult.activities : (Array.isArray(result.activities) ? result.activities : []);
+        renderAssets();
+        renderAdminAssetMasterList();
+        document.getElementById('singleCustomerForm').reset();
+        closeModal('singleCustomerModal');
+        showToast(`Customer and Asset ${assetId} created. Next maintenance starts from MJC date.`);
+        openAdminAssetDetails(record.recordId);
+      } catch (error) {
+        if (assetSynced) {
+          assets = beforeAssets;
+          safeStore.set('bgl_assets_v2', JSON.stringify(assets));
+          await syncAssetsToCloud(false);
+          assetSynced = false;
+        }
+        status.textContent = assetSynced ? `Asset saved, but customer data did not finish saving: ${error.message}` : error.message;
+      } finally { button.disabled = false; }
+    }
+
     async function ensureAssetMetadataSchema() {
       const response = await fetch(`${CLOUD_API_URL}?action=getData&_=${Date.now()}`, { cache: 'no-store' });
       const data = await response.json();
@@ -3043,6 +3201,9 @@
       setMJCFormFromCustomer(record);
       const activitySection = document.getElementById('adminAssetActivityForm').parentElement;
       activitySection.classList.toggle('hidden', selectedAdminDataset !== 'assets');
+      const ipngHistory = document.getElementById('ipngCustomerHistorySection');
+      ipngHistory.classList.toggle('hidden', selectedAdminDataset !== 'ipng_cpng');
+      if (selectedAdminDataset === 'ipng_cpng') renderIPNGCustomerHistory(record);
       const date = document.getElementById('adminActivityDate');
       if (date && !date.value) date.value = localDateKey();
       renderAdminAssetActivityHistory(record);
@@ -3079,6 +3240,133 @@
         showToast('Customer / asset details updated.');
       } catch (error) { status.textContent = error.message; }
       finally { button.disabled = false; }
+    }
+
+    function openIPNGActivityModal(assetId = '', customerRecordId = '') {
+      if (!currentUser) return showToast('Please sign in first.');
+      const asset = assets.find(item => sanitizeKey(item.id) === sanitizeKey(assetId)) ||
+        assets.find(item => selectedAdminAssetRecord && sanitizeKey(item.registrationNo) === sanitizeKey(getCustomerRegistrationNo(selectedAdminAssetRecord)));
+      const customer = (customerRecordId && adminAssetRecords.find(item => String(item.recordId) === String(customerRecordId))) ||
+        (asset?.registrationNo ? adminAssetRecords.find(item => sanitizeKey(getCustomerRegistrationNo(item)) === sanitizeKey(asset.registrationNo)) : null) ||
+        (selectedAdminDataset === 'ipng_cpng' ? selectedAdminAssetRecord : null);
+      const registrationNo = String(asset?.registrationNo || (customer ? getCustomerRegistrationNo(customer) : '')).trim();
+      if (!asset && !registrationNo) return showToast('This Asset is not linked to a customer Registration No. yet.');
+      activeIPNGActivityContext = { assetId: asset?.id || '', registrationNo, customerRecordId: customer?.recordId || '' };
+      const form = document.getElementById('ipngActivityForm');
+      form.reset();
+      document.getElementById('ipngActivityAssetId').value = asset?.id || 'Not linked';
+      document.getElementById('ipngActivityRegNo').value = registrationNo;
+      document.getElementById('ipngActivityDate').value = localDateKey();
+      const technician = document.getElementById('ipngActivityTechnician');
+      const isAdmin = currentUser.role === 'admin';
+      technician.value = isAdmin ? '' : String(currentUser.name || '');
+      technician.readOnly = !isAdmin;
+      technician.placeholder = isAdmin ? 'Enter the technician who performed this work' : '';
+      document.getElementById('ipngActivityStatus').textContent = isAdmin
+        ? 'Admin entry: this activity will be marked Approved. Enter the technician name.'
+        : 'Your activity will be saved as Pending Admin Approval.';
+      document.getElementById('ipngActivitySubtitle').textContent = `${asset?.id || 'Customer'} · Reg. No: ${registrationNo}`;
+      openModal('ipngActivityModal');
+    }
+
+    async function submitIPNGActivity(event) {
+      event.preventDefault();
+      if (!currentUser || !activeIPNGActivityContext) return showToast('Activity context was lost. Open the linked Asset again.');
+      const button = document.getElementById('ipngActivitySubmit');
+      const status = document.getElementById('ipngActivityStatus');
+      const isAdmin = currentUser.role === 'admin';
+      const technician = String(document.getElementById('ipngActivityTechnician').value || '').trim();
+      if (!technician) { status.textContent = 'Enter the technician name who performed the activity.'; return; }
+      button.disabled = true;
+      status.textContent = 'Saving activity…';
+      const activity = {
+        activityId: `IPNG-ACT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        ...activeIPNGActivityContext,
+        activityType: document.getElementById('ipngActivityType').value,
+        activityDate: document.getElementById('ipngActivityDate').value,
+        technician,
+        component: String(document.getElementById('ipngActivityComponent').value || '').trim(),
+        previousValue: String(document.getElementById('ipngActivityPrevious').value || '').trim(),
+        newValue: String(document.getElementById('ipngActivityNew').value || '').trim(),
+        remarks: String(document.getElementById('ipngActivityRemarks').value || '').trim(),
+        submittedBy: String(currentUser.name || currentUser.id || ''),
+        submittedById: String(currentUser.id || ''),
+        approvalStatus: isAdmin ? 'Approved' : 'Pending Approval',
+        reviewedBy: isAdmin ? String(currentUser.name || currentUser.id || '') : '',
+        reviewedAt: isAdmin ? new Date().toISOString() : '',
+        createdAt: new Date().toISOString()
+      };
+      try {
+        await postCloudAction({ action: 'saveIPNGActivity', activity });
+        closeModal('ipngActivityModal');
+        if (isAdmin) {
+          const result = await adminAssetApi('getAdminAssetMaster', { datasetType: 'ipng_cpng' });
+          adminAssetActivities = Array.isArray(result.activities) ? result.activities : [];
+          if (selectedAdminAssetRecord) renderIPNGCustomerHistory(selectedAdminAssetRecord);
+        }
+        showToast(isAdmin ? 'Activity saved as approved.' : 'Activity submitted. It is waiting for admin approval.');
+      } catch (error) { status.textContent = `Could not save activity: ${error.message}`; }
+      finally { button.disabled = false; }
+    }
+
+    async function reviewIPNGActivity(activityId, approvalStatus) {
+      if (currentUser?.role !== 'admin') return showToast('Only an admin can review these activities.');
+      try {
+        await postCloudAction({ action: 'reviewIPNGActivity', activityId, approvalStatus, reviewedBy: currentUser.name || currentUser.id || '' });
+        const result = await adminAssetApi('getAdminAssetMaster', { datasetType: 'ipng_cpng' });
+        adminAssetActivities = Array.isArray(result.activities) ? result.activities : [];
+        if (selectedAdminAssetRecord) renderIPNGCustomerHistory(selectedAdminAssetRecord);
+        showToast(`Activity ${approvalStatus.toLowerCase()}.`);
+      } catch (error) { showToast(`Could not review activity: ${error.message}`); }
+    }
+
+    function renderIPNGCustomerHistory(record) {
+      const container = document.getElementById('ipngCustomerHistoryList');
+      if (!container) return;
+      container.replaceChildren();
+      const registrationNo = getCustomerRegistrationNo(record);
+      const linkedAsset = assets.find(item => registrationNo && sanitizeKey(item.registrationNo) === sanitizeKey(registrationNo));
+      const rows = [];
+      if (linkedAsset) maintenanceHistory.filter(log => sanitizeKey(log.assetId) === sanitizeKey(linkedAsset.id)).forEach(log => rows.push({
+        date: log.date, type: 'Scheduled Maintenance', technician: log.tech, component: linkedAsset.id,
+        remarks: [log.observations, log.remarks].filter(Boolean).join(' · '), beforePhoto: log.beforePhoto, afterPhoto: log.afterPhoto,
+        approvalStatus: 'Completed'
+      }));
+      adminAssetActivities.filter(item =>
+        (item.customerRecordId && String(item.customerRecordId) === String(record.recordId)) ||
+        (registrationNo && sanitizeKey(item.registrationNo) === sanitizeKey(registrationNo)) ||
+        (linkedAsset && item.assetId && sanitizeKey(item.assetId) === sanitizeKey(linkedAsset.id))
+      ).forEach(item => rows.push({ ...item, technician: item.technician || item.performedBy }));
+      rows.sort((a, b) => String(b.activityDate || b.date || '').localeCompare(String(a.activityDate || a.date || '')));
+      if (!rows.length) {
+        const empty = document.createElement('p'); empty.className = 'text-slate-500 p-3';
+        empty.textContent = linkedAsset ? 'No maintenance or equipment activity is recorded for this customer yet.' : 'No linked Asset found. Link or create an Asset to show its maintenance history.';
+        container.appendChild(empty); return;
+      }
+      rows.forEach(item => {
+        const card = document.createElement('article'); card.className = 'rounded-lg border border-slate-800 bg-slate-900/70 p-3';
+        const top = document.createElement('div'); top.className = 'flex flex-wrap items-center justify-between gap-2';
+        const title = document.createElement('strong'); title.className = 'text-white';
+        title.textContent = [item.activityType || item.type || 'Service Activity', item.component].filter(Boolean).join(' · ');
+        const date = document.createElement('span'); date.className = 'text-teal-300'; date.textContent = formatToDDMMYYYY(item.activityDate || item.date);
+        top.append(title, date); card.appendChild(top);
+        const details = document.createElement('p'); details.className = 'text-slate-400 mt-1';
+        details.textContent = `Technician: ${item.technician || item.tech || '—'} · Status: ${item.approvalStatus || 'Completed'}`;
+        card.appendChild(details);
+        if (item.previousValue || item.newValue) { const change = document.createElement('p'); change.className = 'text-slate-300 mt-1'; change.textContent = `Equipment: ${item.previousValue || '—'} → ${item.newValue || '—'}`; card.appendChild(change); }
+        if (item.remarks) { const remarks = document.createElement('p'); remarks.className = 'text-slate-300 mt-1'; remarks.textContent = item.remarks; card.appendChild(remarks); }
+        if (item.beforePhoto || item.beforePhotoUrl) appendAdminPhotoLink(card, item.beforePhoto || item.beforePhotoUrl, 'Before photo');
+        if (item.afterPhoto || item.afterPhotoUrl) appendAdminPhotoLink(card, item.afterPhoto || item.afterPhotoUrl, 'After photo');
+        if (currentUser?.role === 'admin' && item.approvalStatus === 'Pending Approval') {
+          const controls = document.createElement('div'); controls.className = 'flex gap-2 mt-2';
+          [['Approved', 'Approve', 'bg-emerald-700'], ['Rejected', 'Reject', 'bg-rose-800']].forEach(([value, label, color]) => {
+            const button = document.createElement('button'); button.type = 'button'; button.className = `px-3 py-1.5 rounded-lg text-white ${color}`;
+            button.textContent = label; button.addEventListener('click', () => reviewIPNGActivity(item.activityId, value)); controls.appendChild(button);
+          });
+          card.appendChild(controls);
+        }
+        container.appendChild(card);
+      });
     }
 
     function appendAdminPhotoLink(parent, value, label) {
