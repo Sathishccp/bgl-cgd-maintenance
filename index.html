@@ -740,6 +740,11 @@
         <button onclick="closeModal('adminAssetDetailModal')" class="text-slate-400 hover:text-white p-1" aria-label="Close record details"><i class="fa-solid fa-xmark fa-lg"></i></button>
       </div>
       <div id="adminAssetDetailGroups" class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4"></div>
+      <form id="adminAssetEditForm" onsubmit="saveAdminAssetRecord(event)" class="border-t border-slate-800 pt-3 mb-4">
+        <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-pen-to-square text-amber-300 mr-1"></i> Edit Customer / Asset Details</h4>
+        <div id="adminAssetEditFields" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+        <div class="flex items-center justify-between gap-3 mt-3"><p id="adminAssetEditStatus" class="text-amber-300"></p><button type="submit" class="px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-semibold whitespace-nowrap">Save Changed Fields</button></div>
+      </form>
       <section class="border-t border-slate-800 pt-3">
         <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-clock-rotate-left text-teal-300 mr-1"></i> Complete Activity History</h4>
         <form id="adminAssetActivityForm" onsubmit="submitAdminAssetActivity(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 mb-3">
@@ -2501,13 +2506,12 @@
         if (!records.length) throw new Error('No data rows were found under the header.');
         const fileName = input.files[0].name || 'Selected Excel file';
         const detectedType = detectAdminWorkbookType(fileName, sheetName, columns);
-        if (detectedType && detectedType !== selectedAdminDataset) {
-          summary.textContent = `This workbook looks like “${ADMIN_DATASET_LABELS[detectedType]}”, but “${ADMIN_DATASET_LABELS[selectedAdminDataset]}” is selected. Change the destination, then choose the file again.`;
-          return;
-        }
         pendingAdminAssetImport = { columns, records, sheetName, fileName, datasetType: selectedAdminDataset };
         button.disabled = false;
-        summary.textContent = `File: “${fileName}”. Destination: ${ADMIN_DATASET_LABELS[selectedAdminDataset]}. Ready to import ${records.length} rows and ${columns.length} columns from “${sheetName}”. Nothing is uploaded until you choose Import.`;
+        const mismatchWarning = detectedType && detectedType !== selectedAdminDataset
+          ? `Warning: this file looks like “${ADMIN_DATASET_LABELS[detectedType]}”. You selected “${ADMIN_DATASET_LABELS[selectedAdminDataset]}”. Confirm carefully before importing.`
+          : '';
+        summary.textContent = [mismatchWarning, `File: “${fileName}”. Destination: ${ADMIN_DATASET_LABELS[selectedAdminDataset]}. Ready to import ${records.length} rows and ${columns.length} columns from “${sheetName}”. Nothing is uploaded until you choose Import.`].filter(Boolean).join(' ');
       } catch (error) {
         summary.textContent = `Could not read workbook: ${error.message}`;
       }
@@ -2607,12 +2611,47 @@
         });
         section.append(heading, body); groups.appendChild(section);
       });
+      const editFields = document.getElementById('adminAssetEditFields');
+      editFields.replaceChildren();
+      adminAssetColumns.forEach(column => {
+        const wrapper = document.createElement('label'); wrapper.className = 'block text-slate-400 min-w-0';
+        const label = document.createElement('span'); label.className = 'block mb-1 truncate'; label.textContent = column.label;
+        const input = document.createElement('input'); input.type = 'text'; input.value = String(record[column.key] || '');
+        input.dataset.adminColumnKey = column.key; input.maxLength = 5000;
+        input.className = 'w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white';
+        wrapper.append(label, input); editFields.appendChild(wrapper);
+      });
+      document.getElementById('adminAssetEditStatus').textContent = '';
       const activitySection = document.getElementById('adminAssetActivityForm').parentElement;
       activitySection.classList.toggle('hidden', selectedAdminDataset !== 'assets');
       const date = document.getElementById('adminActivityDate');
       if (date && !date.value) date.value = localDateKey();
       renderAdminAssetActivityHistory(record);
       openModal('adminAssetDetailModal');
+    }
+
+    async function saveAdminAssetRecord(event) {
+      event.preventDefault();
+      if (!selectedAdminAssetRecord || currentUser?.role !== 'admin') return showToast('Admin access required.');
+      const updates = {};
+      document.querySelectorAll('#adminAssetEditFields [data-admin-column-key]').forEach(input => {
+        const key = input.dataset.adminColumnKey;
+        const value = String(input.value || '').trim();
+        if (value !== String(selectedAdminAssetRecord[key] || '').trim()) updates[key] = value;
+      });
+      if (!Object.keys(updates).length) return showToast('No changed fields to save.');
+      const button = document.querySelector('#adminAssetEditForm button[type="submit"]');
+      const status = document.getElementById('adminAssetEditStatus');
+      button.disabled = true; status.textContent = 'Saving changes securely…';
+      try {
+        await adminAssetApi('updateAdminAssetRecord', { datasetType: selectedAdminDataset, recordId: selectedAdminAssetRecord.recordId, updates });
+        const id = selectedAdminAssetRecord.recordId;
+        status.textContent = 'Changes saved.';
+        await loadAdminAssetMaster();
+        openAdminAssetDetails(id);
+        showToast('Customer / asset details updated.');
+      } catch (error) { status.textContent = error.message; }
+      finally { button.disabled = false; }
     }
 
     function appendAdminPhotoLink(parent, value, label) {
