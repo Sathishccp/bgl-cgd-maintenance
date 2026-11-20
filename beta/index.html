@@ -37,6 +37,45 @@
     .tap-copy:active { transform: scale(0.98); background-color: rgba(20, 184, 166, 0.15); }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Beta visual refresh inspired by BGL Gas: clean white surfaces and green accents. */
+    body { background: #f3f6f3; color: #24332a; font-family: "Roboto", "Segoe UI", Arial, sans-serif; }
+    .glass-card { background: #fff; backdrop-filter: none; border-color: #dce6df; box-shadow: 0 8px 26px rgba(24, 55, 36, .08); }
+    #appContainer .bg-slate-950, #appContainer .bg-slate-900, #appContainer .bg-slate-900\/80,
+    #appContainer .bg-slate-900\/95, #appContainer .bg-slate-900\/60, #appContainer .bg-slate-800 {
+      background-color: #fff;
+    }
+    #appContainer .bg-slate-800\/40, #appContainer .hover\:bg-slate-800\/40:hover,
+    #appContainer .hover\:bg-slate-800:hover, #appContainer .hover\:bg-slate-700:hover {
+      background-color: #eef4ef;
+    }
+    #appContainer [class*="border-slate-"] { border-color: #dce6df; }
+    #appContainer .text-white { color: #20352a; }
+    #appContainer .text-slate-300, #appContainer .text-slate-400 { color: #5d6d63; }
+    #appContainer .text-slate-500, #appContainer .text-slate-600 { color: #77877d; }
+    #appContainer .text-teal-300, #appContainer .text-teal-400 { color: #087b48; }
+    #appContainer .bg-teal-600.text-white, #appContainer .bg-teal-700.text-white,
+    #appContainer .bg-green-600.text-white, #appContainer .bg-emerald-600.text-white,
+    #appContainer .bg-rose-600.text-white, #appContainer .bg-red-600.text-white,
+    #appContainer button.bg-teal-600, #appContainer button.bg-teal-700,
+    #appContainer button.bg-green-600, #appContainer button.bg-emerald-600,
+    #appContainer button.bg-rose-600, #appContainer button.bg-red-600 { color: #fff; }
+    #appContainer header { background: rgba(255,255,255,.96); border-color: #dce6df; }
+    #appContainer input:not([type="checkbox"]):not([type="radio"]),
+    #appContainer select, #appContainer textarea { color: #24332a; background-color: #fbfdfb; border-color: #cbd9cf; }
+    #appContainer input::placeholder, #appContainer textarea::placeholder { color: #87958b; }
+    #appContainer input[type="file"] { color: #5d6d63; }
+    #appContainer .bg-teal-600 { background-color: #087b48; }
+    #appContainer .hover\:bg-teal-500:hover { background-color: #06653b; }
+    #appContainer .bg-teal-700 { background-color: #076b40; }
+    #loginSection { background: #edf4ee; }
+    #loginSection .glass-card { background: #fff; border-color: #dce6df; }
+    #loginSection h2 { color: #20352a; }
+    #loginSection label, #loginSection p { color: #5d6d63; }
+    #loginSection input { color: #24332a; background: #fbfdfb; border-color: #cbd9cf; }
+    .photo-preview-trigger { cursor: zoom-in; }
+    .photo-preview-trigger:hover { filter: brightness(.95); }
+    #photoPreviewModal iframe { background: #f3f6f3; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-teal-500 selection:text-white pb-12 sm:pb-6">
@@ -688,7 +727,7 @@
         <div class="flex items-center justify-end gap-2 pt-2">
           <button type="button" onclick="closeModal('maintenanceModal')" class="px-3.5 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Cancel</button>
           <button type="submit" id="submitMaintBtn" class="px-4 py-2 bg-teal-600 text-white font-medium rounded hover:bg-teal-500 flex items-center gap-1.5">
-            <i class="fa-solid fa-check"></i> Close & Sync to Drive
+            <i class="fa-solid fa-check"></i> Submit Maintenance
           </button>
         </div>
       </form>
@@ -708,6 +747,21 @@
         <button onclick="closeModal('assetHistoryModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark fa-lg"></i></button>
       </div>
       <div id="historyTimelineContainer" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- In-page photo viewer: keeps technicians inside the maintenance page. -->
+  <div id="photoPreviewModal" class="hidden fixed inset-0 z-[90] bg-slate-950/80 flex items-center justify-center p-3 sm:p-6" onclick="if(event.target===this)closePhotoPreview()">
+    <div class="glass-card w-full max-w-5xl rounded-2xl overflow-hidden flex flex-col max-h-[94vh]">
+      <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200">
+        <div class="min-w-0"><h3 id="photoPreviewTitle" class="font-bold text-slate-900 truncate">Maintenance Photo</h3><p class="text-xs text-slate-500">Photo preview</p></div>
+        <button type="button" onclick="closePhotoPreview()" aria-label="Close photo preview" class="shrink-0 w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex-1 min-h-0 bg-slate-100 flex items-center justify-center p-2 sm:p-4 overflow-auto">
+        <img id="photoPreviewImage" class="hidden max-w-full max-h-[78vh] object-contain rounded-lg" alt="Maintenance photo preview">
+        <iframe id="photoPreviewFrame" class="hidden w-full h-[78vh] rounded-lg border-0" title="Google Drive photo preview" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay"></iframe>
+        <p id="photoPreviewError" class="hidden text-sm text-slate-600 text-center p-8">This photo cannot be previewed here. Check that the Drive file is shared with your account.</p>
+      </div>
     </div>
   </div>
 
@@ -1876,7 +1930,7 @@
               <b>Due:</b> ${info.dueDateFormatted} (${info.status})<br/>
               ${asset.assignedTech ? `<span style="color:#0f766e; font-weight:bold;">Assigned: ${asset.assignedTech}</span><br/>` : ''}
               <div style="margin-top: 8px; display:flex; gap: 4px; flex-wrap:wrap;">
-                ${info.status === 'Maintenance Hold' ? '<span style="background:#334155; color:#cbd5e1; padding:4px 8px; border-radius:4px; font-size:11px;">Maintenance Hold</span>' : `<button onclick="openMaintenanceModal('${asset.id}')" style="background:#0f766e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px;">Inspect & Close</button>`}
+                ${info.status === 'Maintenance Hold' ? '<span style="background:#334155; color:#cbd5e1; padding:4px 8px; border-radius:4px; font-size:11px;">Maintenance Hold</span>' : `<button onclick="openMaintenanceModal('${asset.id}')" style="background:#0f766e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px;">Record Maintenance</button>`}
                 <a href="https://www.google.com/maps/dir/?api=1&destination=${asset.lat},${asset.lng}" target="_blank" style="background:#1e293b; color:#38bdf8; border:none; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px;">
                   Navigate
                 </a>
@@ -1931,11 +1985,11 @@
                 <button onclick="openAssignModal('${asset.id}')" title="Assign Technician" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700">
                   <i class="fa-solid fa-user-tag"></i>
                 </button>
-                <button onclick="openAssetHistory('${asset.id}')" title="Maintenance History" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700">
-                  <i class="fa-solid fa-timeline"></i>
-                </button>
               ` : ''}
-              ${info.status === 'Maintenance Hold' ? '<span class="px-2.5 py-1.5 bg-slate-800 text-slate-400 rounded text-[10px]">Hold</span>' : `<button onclick="openMaintenanceModal('${asset.id}')" class="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded text-xs shadow flex items-center gap-1"><i class="fa-solid fa-clipboard-check"></i> <span class="hidden sm:inline">Close</span></button>`}
+              <button onclick="openAssetHistory('${asset.id}')" title="View Asset Maintenance History" aria-label="View ${asset.id} maintenance history" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700">
+                <i class="fa-solid fa-timeline"></i>
+              </button>
+              ${info.status === 'Maintenance Hold' ? '<span class="px-2.5 py-1.5 bg-slate-800 text-slate-400 rounded text-[10px]">Hold</span>' : `<button title="Record Maintenance" onclick="openMaintenanceModal('${asset.id}')" class="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded text-xs shadow flex items-center gap-1"><i class="fa-solid fa-clipboard-check"></i> <span class="hidden sm:inline">Record Maintenance</span></button>`}
             </div>
           </td>
         `;
@@ -2159,8 +2213,8 @@
         document.getElementById('maintObservations').value = draft.observations || '';
         document.getElementById('maintRemarks').value = draft.remarks || '';
         if (currentUser.role === 'admin') techSelect.value = draft.technician || '';
-        if (draft.beforePhoto) document.getElementById('beforePreview').innerHTML = `<img src="${draft.beforePhoto}" class="w-full h-full object-cover">`;
-        if (draft.afterPhoto) document.getElementById('afterPreview').innerHTML = `<img src="${draft.afterPhoto}" class="w-full h-full object-cover">`;
+        if (draft.beforePhoto) document.getElementById('beforePreview').innerHTML = `<img src="${draft.beforePhoto}" alt="Before maintenance" onclick="openPhotoPreviewImage(this.src,'Before Photo')" class="photo-preview-trigger w-full h-full object-cover">`;
+        if (draft.afterPhoto) document.getElementById('afterPreview').innerHTML = `<img src="${draft.afterPhoto}" alt="After maintenance" onclick="openPhotoPreviewImage(this.src,'After Photo')" class="photo-preview-trigger w-full h-full object-cover">`;
       }
       persistMaintenanceDraftNow(true);
       openModal('maintenanceModal');
@@ -2182,7 +2236,8 @@
           canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
           canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
           const compressed = canvas.toDataURL('image/jpeg', 0.78);
-          document.getElementById(targetId).innerHTML = `<img src="${compressed}" class="w-full h-full object-cover">`;
+          const photoLabel = targetId === 'beforePreview' ? 'Before Photo' : 'After Photo';
+          document.getElementById(targetId).innerHTML = `<img src="${compressed}" alt="${photoLabel}" onclick="openPhotoPreviewImage(this.src,'${photoLabel}')" class="photo-preview-trigger w-full h-full object-cover">`;
           saveMaintenanceDraft();
         };
         image.onerror = () => showToast('Could not read this photo. Please choose another image.');
@@ -2194,6 +2249,77 @@
     function getPhotoLink(value) {
       const link = String(value || '').trim();
       return /^https?:\/\//i.test(link) ? link : '';
+    }
+
+    function openPhotoPreview(value, label = 'Maintenance Photo') {
+      const link = getPhotoLink(value);
+      const modal = document.getElementById('photoPreviewModal');
+      const image = document.getElementById('photoPreviewImage');
+      const frame = document.getElementById('photoPreviewFrame');
+      const error = document.getElementById('photoPreviewError');
+      if (!link) return showToast('Photo link is unavailable.');
+
+      document.getElementById('photoPreviewTitle').textContent = label;
+      image.classList.add('hidden');
+      frame.classList.add('hidden');
+      error.classList.add('hidden');
+      image.onload = null;
+      image.onerror = null;
+      frame.src = 'about:blank';
+
+      let url;
+      try { url = new URL(link); } catch (_) { return showToast('This photo link is not valid.'); }
+      const driveFileId = url.hostname.endsWith('google.com')
+        ? (url.pathname.match(/\/file\/d\/([^/]+)/)?.[1] || url.searchParams.get('id'))
+        : null;
+
+      if (driveFileId && (url.hostname === 'drive.google.com' || url.hostname.endsWith('.drive.google.com'))) {
+        frame.src = `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/preview`;
+        frame.classList.remove('hidden');
+      } else if (/^data:image\//i.test(link) || /\.(png|jpe?g|gif|webp|bmp)(\?|#|$)/i.test(url.pathname + url.search)) {
+        image.onload = () => image.classList.remove('hidden');
+        image.onerror = () => { image.classList.add('hidden'); error.classList.remove('hidden'); };
+        image.src = link;
+      } else {
+        frame.src = link;
+        frame.classList.remove('hidden');
+      }
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function openPhotoPreviewImage(src, label = 'Maintenance Photo') {
+      const modal = document.getElementById('photoPreviewModal');
+      const image = document.getElementById('photoPreviewImage');
+      const frame = document.getElementById('photoPreviewFrame');
+      const error = document.getElementById('photoPreviewError');
+      document.getElementById('photoPreviewTitle').textContent = label;
+      frame.src = 'about:blank';
+      frame.classList.add('hidden');
+      error.classList.add('hidden');
+      image.src = src;
+      image.classList.remove('hidden');
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function closePhotoPreview() {
+      document.getElementById('photoPreviewModal').classList.add('hidden');
+      document.getElementById('photoPreviewImage').src = '';
+      document.getElementById('photoPreviewFrame').src = 'about:blank';
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    function appendPhotoPreviewButton(container, value, label, buttonText) {
+      const link = getPhotoLink(value);
+      if (!link || !container) return false;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'text-xs font-semibold text-teal-700 hover:text-green-800 underline underline-offset-2';
+      button.textContent = buttonText;
+      button.addEventListener('click', () => openPhotoPreview(link, label));
+      container.appendChild(button);
+      return true;
     }
 
     async function submitMaintenance(e) {
@@ -2275,7 +2401,7 @@
         showToast("Cloud save failed; date unchanged. Please retry.");
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-check"></i> Close & Sync to Drive`;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Submit Maintenance`;
         hideLoader();
       }
     }
@@ -2422,11 +2548,14 @@
             </div>
             <p class="text-slate-300 text-[11px]"><b>Observations:</b> ${rec.observations || '--'}</p>
             <p class="text-slate-400 text-[11px]"><b>Remarks:</b> ${rec.remarks || '--'}</p>
-            <div class="flex items-center gap-3 pt-1">
-              ${getPhotoLink(rec.beforePhoto) ? `<a href="${getPhotoLink(rec.beforePhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline mr-2">View Before (Drive)</a>` : (rec.beforePhoto ? '<span class="text-xs text-slate-500 mr-2">Before photo link unavailable</span>' : '')}
-              ${getPhotoLink(rec.afterPhoto) ? `<a href="${getPhotoLink(rec.afterPhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View After (Drive)</a>` : (rec.afterPhoto ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : '')}
+            <div class="flex items-center gap-3 pt-1 photoPreviewButtons">
+              ${rec.beforePhoto && !getPhotoLink(rec.beforePhoto) ? '<span class="text-xs text-slate-500">Before photo link unavailable</span>' : ''}
+              ${rec.afterPhoto && !getPhotoLink(rec.afterPhoto) ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : ''}
             </div>
           `;
+          const photoButtons = card.querySelector('.photoPreviewButtons');
+          appendPhotoPreviewButton(photoButtons, rec.beforePhoto, 'Before Photo · ' + rec.assetId, 'View Before');
+          appendPhotoPreviewButton(photoButtons, rec.afterPhoto, 'After Photo · ' + rec.assetId, 'View After');
           container.appendChild(card);
         });
       }
@@ -2452,11 +2581,14 @@
               <span class="text-[11px] text-teal-400 font-mono">${formatToDDMMYYYY(job.date)}</span>
             </div>
             <p class="text-slate-400 text-[11px]"><b>Observations:</b> ${job.observations || 'N/A'}</p>
-            <div class="flex items-center gap-3 pt-1">
-              ${getPhotoLink(job.beforePhoto) ? `<a href="${getPhotoLink(job.beforePhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View Before Photo</a>` : (job.beforePhoto ? '<span class="text-xs text-slate-500">Before photo link unavailable</span>' : '')}
-              ${getPhotoLink(job.afterPhoto) ? `<a href="${getPhotoLink(job.afterPhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View After Photo</a>` : (job.afterPhoto ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : '')}
+            <div class="flex items-center gap-3 pt-1 photoPreviewButtons">
+              ${job.beforePhoto && !getPhotoLink(job.beforePhoto) ? '<span class="text-xs text-slate-500">Before photo link unavailable</span>' : ''}
+              ${job.afterPhoto && !getPhotoLink(job.afterPhoto) ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : ''}
             </div>
           `;
+          const photoButtons = card.querySelector('.photoPreviewButtons');
+          appendPhotoPreviewButton(photoButtons, job.beforePhoto, 'Before Photo · ' + job.assetId, 'View Before');
+          appendPhotoPreviewButton(photoButtons, job.afterPhoto, 'After Photo · ' + job.assetId, 'View After');
           container.appendChild(card);
         });
       }
@@ -2887,12 +3019,15 @@
           <td class="p-2 font-semibold text-white">${r.assetId}</td>
           <td class="p-2">${r.tech}</td>
           <td class="p-2 text-slate-400">${r.remarks || '--'}</td>
-          <td class="p-2 text-center">
-            ${getPhotoLink(r.beforePhoto) ? `<a href="${getPhotoLink(r.beforePhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline mr-2">Before</a>` : (r.beforePhoto ? '<span class="text-slate-500 mr-2">Before unavailable</span>' : '')}
-            ${getPhotoLink(r.afterPhoto) ? `<a href="${getPhotoLink(r.afterPhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">After</a>` : (r.afterPhoto ? '<span class="text-slate-500">After unavailable</span>' : '')}
+          <td class="p-2 text-center"><div class="flex items-center justify-center gap-3 photoPreviewButtons">
             ${!r.beforePhoto && !r.afterPhoto ? '<span class="text-slate-600">None</span>' : ''}
-          </td>
+            ${r.beforePhoto && !getPhotoLink(r.beforePhoto) ? '<span class="text-slate-500">Before unavailable</span>' : ''}
+            ${r.afterPhoto && !getPhotoLink(r.afterPhoto) ? '<span class="text-slate-500">After unavailable</span>' : ''}
+          </div></td>
         `;
+        const photoButtons = tr.querySelector('.photoPreviewButtons');
+        appendPhotoPreviewButton(photoButtons, r.beforePhoto, 'Before Photo · ' + r.assetId, 'Before');
+        appendPhotoPreviewButton(photoButtons, r.afterPhoto, 'After Photo · ' + r.assetId, 'After');
         tbody.appendChild(tr);
       });
     }
@@ -3086,6 +3221,9 @@ async function openLptReport(no){try{setLptStatus('Loading submitted report…')
     
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !document.getElementById('photoPreviewModal').classList.contains('hidden')) closePhotoPreview();
+    });
   </script>
 </body>
 </html>
