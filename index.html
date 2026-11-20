@@ -2414,6 +2414,45 @@
         .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || 'field';
     }
 
+    function isGoogleLocationColumn(column) {
+      return /google\s*location/i.test(String(column?.label || '')) || /google_location/i.test(String(column?.key || ''));
+    }
+
+    function googleMapsUrl(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      const coordinateMatch = text.match(/(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/);
+      if (coordinateMatch) {
+        const lat = Number(coordinateMatch[1]), lng = Number(coordinateMatch[2]);
+        if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+      }
+      try {
+        const parsed = new URL(text);
+        if (parsed.protocol === 'https:' && /(^|\.)google\.[a-z.]+$|(^|\.)maps\.app\.goo\.gl$|(^|\.)goo\.gl$/i.test(parsed.hostname)) return parsed.href;
+      } catch (_) {}
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
+    }
+
+    function formatCustomerDate(label, value) {
+      const text = String(value || '').trim();
+      if (!text || !/(date|commission|calibration|installation)/i.test(String(label || ''))) return text;
+      let day, month, year;
+      const isoDate = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoDate) { year = isoDate[1]; month = isoDate[2]; day = isoDate[3]; }
+      else if (/^\d{4}-\d{2}-\d{2}T/.test(text)) {
+        const date = new Date(text);
+        if (!Number.isNaN(date.getTime())) {
+          const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).formatToParts(date);
+          const part = key => parts.find(item => item.type === key)?.value || '';
+          day = part('day'); month = part('month'); year = part('year');
+        }
+      } else {
+        const dmy = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+        if (dmy) { day = dmy[1]; month = dmy[2]; year = dmy[3]; }
+      }
+      return day && month && year ? `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}` : text;
+    }
+
     function detectAdminWorkbookType(fileName, sheetName, columns) {
       const fileHint = `${fileName || ''} ${sheetName || ''}`.toLowerCase();
       const labels = columns.map(column => `${column.group || ''} ${column.label || ''} ${column.key || ''}`).join(' ').toLowerCase();
@@ -2600,7 +2639,13 @@
         fields.forEach(field => {
           const item = document.createElement('div'); item.className = 'min-w-0';
           const dt = document.createElement('dt'); dt.className = 'text-slate-500'; dt.textContent = field.label;
-          const dd = document.createElement('dd'); dd.className = 'text-slate-200 break-words'; dd.textContent = field.value;
+          const dd = document.createElement('dd'); dd.className = 'text-slate-200 break-words';
+          const column = adminAssetColumns.find(candidate => candidate.label === field.label);
+          if (column && isGoogleLocationColumn(column)) {
+            const link = document.createElement('a'); link.href = googleMapsUrl(field.value); link.target = '_blank'; link.rel = 'noopener noreferrer';
+            link.className = 'text-teal-300 underline hover:text-teal-200'; link.textContent = 'Open in Google Maps';
+            dd.appendChild(link);
+          } else dd.textContent = formatCustomerDate(field.label, field.value);
           item.append(dt, dd); body.appendChild(item);
         });
         section.append(heading, body); groups.appendChild(section);
@@ -2610,7 +2655,12 @@
       adminAssetColumns.forEach(column => {
         const wrapper = document.createElement('label'); wrapper.className = 'block text-slate-400 min-w-0';
         const label = document.createElement('span'); label.className = 'block mb-1 truncate'; label.textContent = column.label;
-        const input = document.createElement('input'); input.type = 'text'; input.value = String(record[column.key] || '');
+        if (isGoogleLocationColumn(column)) {
+          const mapLink = document.createElement('a'); mapLink.href = googleMapsUrl(record[column.key]); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer';
+          mapLink.className = 'block w-full p-2 text-teal-300 underline bg-slate-950 border border-slate-700 rounded-lg'; mapLink.textContent = 'Open in Google Maps';
+          wrapper.append(label, mapLink); editFields.appendChild(wrapper); return;
+        }
+        const input = document.createElement('input'); input.type = 'text'; input.value = formatCustomerDate(column.label, record[column.key] || '');
         input.dataset.adminColumnKey = column.key; input.maxLength = 5000;
         input.className = 'w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white';
         wrapper.append(label, input); editFields.appendChild(wrapper);
