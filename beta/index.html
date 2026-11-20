@@ -38,41 +38,12 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* Beta visual refresh inspired by BGL Gas: clean white surfaces and green accents. */
-    body { background: #f3f6f3; color: #24332a; font-family: "Roboto", "Segoe UI", Arial, sans-serif; }
-    .glass-card { background: #fff; backdrop-filter: none; border-color: #dce6df; box-shadow: 0 8px 26px rgba(24, 55, 36, .08); }
-    #appContainer .bg-slate-950, #appContainer .bg-slate-900, #appContainer .bg-slate-900\/80,
-    #appContainer .bg-slate-900\/95, #appContainer .bg-slate-900\/60, #appContainer .bg-slate-800 {
-      background-color: #fff;
-    }
-    #appContainer .bg-slate-800\/40, #appContainer .hover\:bg-slate-800\/40:hover,
-    #appContainer .hover\:bg-slate-800:hover, #appContainer .hover\:bg-slate-700:hover {
-      background-color: #eef4ef;
-    }
-    #appContainer [class*="border-slate-"] { border-color: #dce6df; }
-    #appContainer .text-white { color: #20352a; }
-    #appContainer .text-slate-300, #appContainer .text-slate-400 { color: #5d6d63; }
-    #appContainer .text-slate-500, #appContainer .text-slate-600 { color: #77877d; }
-    #appContainer .text-teal-300, #appContainer .text-teal-400 { color: #087b48; }
-    #appContainer .bg-teal-600.text-white, #appContainer .bg-teal-700.text-white,
-    #appContainer .bg-green-600.text-white, #appContainer .bg-emerald-600.text-white,
-    #appContainer .bg-rose-600.text-white, #appContainer .bg-red-600.text-white,
-    #appContainer button.bg-teal-600, #appContainer button.bg-teal-700,
-    #appContainer button.bg-green-600, #appContainer button.bg-emerald-600,
-    #appContainer button.bg-rose-600, #appContainer button.bg-red-600 { color: #fff; }
-    #appContainer header { background: rgba(255,255,255,.96); border-color: #dce6df; }
-    #appContainer input:not([type="checkbox"]):not([type="radio"]),
-    #appContainer select, #appContainer textarea { color: #24332a; background-color: #fbfdfb; border-color: #cbd9cf; }
-    #appContainer input::placeholder, #appContainer textarea::placeholder { color: #87958b; }
-    #appContainer input[type="file"] { color: #5d6d63; }
-    #appContainer .bg-teal-600 { background-color: #087b48; }
-    #appContainer .hover\:bg-teal-500:hover { background-color: #06653b; }
-    #appContainer .bg-teal-700 { background-color: #076b40; }
-    #loginSection { background: #edf4ee; }
-    #loginSection .glass-card { background: #fff; border-color: #dce6df; }
-    #loginSection h2 { color: #20352a; }
-    #loginSection label, #loginSection p { color: #5d6d63; }
-    #loginSection input { color: #24332a; background: #fbfdfb; border-color: #cbd9cf; }
+    /* Keep the work portal on a consistent dark, full-page background. */
+    body { background: #070d18; color: #e2e8f0; font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+    .glass-card { background: rgba(15, 23, 42, .97); backdrop-filter: blur(12px); border-color: rgba(148, 163, 184, .2); }
+    #appContainer, #loginSection { background-color: #070d18; }
+    #appContainer header { background: rgba(15, 23, 42, .97); border-color: #1e293b; }
+    #photoPreviewModal iframe { background: #070d18; }
     .photo-preview-trigger { cursor: zoom-in; }
     .photo-preview-trigger:hover { filter: brightness(.95); }
     #photoPreviewModal iframe { background: #f3f6f3; }
@@ -200,6 +171,17 @@
           <button onclick="openProgressModal()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 flex items-center gap-1">
             <i class="fa-solid fa-chart-line"></i> <span class="hidden sm:inline">Progress</span>
           </button>
+
+          <div id="languageSelector" class="relative">
+            <button id="languageButton" type="button" onclick="toggleLanguageMenu()" aria-haspopup="true" aria-expanded="false" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 flex items-center gap-1.5">
+              <i class="fa-solid fa-globe"></i><span id="currentLanguageLabel">English</span><i class="fa-solid fa-chevron-down text-[9px]"></i>
+            </button>
+            <div id="languageMenu" class="hidden absolute right-0 top-full mt-1 min-w-36 z-[80] rounded-xl border border-slate-700 bg-slate-900 shadow-xl p-1.5">
+              <button type="button" onclick="setInterfaceLanguage('en')" class="w-full text-left px-3 py-2 rounded-lg text-xs text-white hover:bg-slate-800">English</button>
+              <button type="button" onclick="setInterfaceLanguage('te')" class="w-full text-left px-3 py-2 rounded-lg text-xs text-white hover:bg-slate-800">తెలుగు</button>
+              <button type="button" onclick="setInterfaceLanguage('hi')" class="w-full text-left px-3 py-2 rounded-lg text-xs text-white hover:bg-slate-800">हिन्दी</button>
+            </div>
+          </div>
 
           <button onclick="handleLogout()" title="Logout" class="p-1.5 sm:p-2 rounded-lg text-xs bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 transition">
             <i class="fa-solid fa-power-off"></i>
@@ -3224,6 +3206,283 @@ async function openLptReport(no){try{setLptStatus('Loading submitted report…')
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && !document.getElementById('photoPreviewModal').classList.contains('hidden')) closePhotoPreview();
     });
+
+    const UI_TRANSLATIONS = {
+      'Sign In': { te: 'లాగిన్', hi: 'साइन इन' },
+      'User ID': { te: 'వినియోగదారు ఐడి', hi: 'यूज़र आईडी' },
+      'Password': { te: 'పాస్‌వర్డ్', hi: 'पासवर्ड' },
+      'Bhagyanagar Gas Limited': { te: 'భాగ్యనగర్ గ్యాస్ లిమిటెడ్', hi: 'भाग्यनगर गैस लिमिटेड' },
+      'Field Operations & Maintenance Portal': { te: 'ఫీల్డ్ ఆపరేషన్స్ & మెయింటెనెన్స్ పోర్టల్', hi: 'फील्ड ऑपरेशंस और मेंटेनेंस पोर्टल' },
+      'My Location': { te: 'నా స్థానం', hi: 'मेरी लोकेशन' },
+      'Asset': { te: 'ఆస్తి', hi: 'एसेट' },
+      'Frequency': { te: 'ఫ్రీక్వెన్సీ', hi: 'अंतराल' },
+      'Icons': { te: 'ఐకాన్లు', hi: 'आइकन' },
+      'Notice': { te: 'నోటీసు', hi: 'सूचना' },
+      'Staff Logins': { te: 'సిబ్బంది లాగిన్లు', hi: 'स्टाफ लॉगिन' },
+      'Reports': { te: 'రిపోర్టులు', hi: 'रिपोर्ट' },
+      'Progress': { te: 'ప్రగతి', hi: 'प्रगति' },
+      'Asset Maintenance': { te: 'ఆస్తి నిర్వహణ', hi: 'एसेट रखरखाव' },
+      'Other Maintenance': { te: 'ఇతర నిర్వహణ', hi: 'अन्य रखरखाव' },
+      'Total Unique Assets': { te: 'మొత్తం ప్రత్యేక ఆస్తులు', hi: 'कुल अलग एसेट' },
+      'Healthy': { te: 'సక్రమంగా ఉంది', hi: 'ठीक है' },
+      'Due Soon (≤15d)': { te: 'త్వరలో గడువు (≤15 రోజులు)', hi: 'जल्द देय (≤15 दिन)' },
+      'High Alert (Overdue)': { te: 'అధిక హెచ్చరిక (గడువు దాటింది)', hi: 'उच्च चेतावनी (समय सीमा पार)' },
+      'Search Asset ID, Location, Team, Technician...': { te: 'ఆస్తి ఐడి, స్థలం, టీమ్ లేదా టెక్నీషియన్ కోసం వెతకండి...', hi: 'एसेट आईडी, लोकेशन, टीम या तकनीशियन खोजें...' },
+      'All': { te: 'అన్నీ', hi: 'सभी' },
+      'Assets Registry': { te: 'ఆస్తుల జాబితా', hi: 'एसेट सूची' },
+      'Select assets to assign a technician': { te: 'టెక్నీషియన్‌ను కేటాయించడానికి ఆస్తులను ఎంచుకోండి', hi: 'तकनीशियन असाइन करने के लिए एसेट चुनें' },
+      'Deselect All': { te: 'ఎంపికలు తీసివేయి', hi: 'सभी हटाएँ' },
+      'Assign to Technician': { te: 'టెక్నీషియన్‌కు కేటాయించండి', hi: 'तकनीशियन को असाइन करें' },
+      'Asset Details': { te: 'ఆస్తి వివరాలు', hi: 'एसेट विवरण' },
+      'Type': { te: 'రకం', hi: 'प्रकार' },
+      'Team': { te: 'టీమ్', hi: 'टीम' },
+      'Distance': { te: 'దూరం', hi: 'दूरी' },
+      'Next Due': { te: 'తదుపరి గడువు', hi: 'अगली देय तारीख' },
+      'Status': { te: 'స్థితి', hi: 'स्थिति' },
+      'Actions': { te: 'చర్యలు', hi: 'कार्रवाई' },
+      'Record Maintenance': { te: 'మెయింటెనెన్స్ నమోదు', hi: 'रखरखाव दर्ज करें' },
+      'Submit Maintenance': { te: 'మెయింటెనెన్స్ సమర్పించండి', hi: 'रखरखाव जमा करें' },
+      'Technician': { te: 'టెక్నీషియన్', hi: 'तकनीशियन' },
+      'Date Conducted': { te: 'చేసిన తేదీ', hi: 'कार्य की तारीख' },
+      'Before Photo': { te: 'ముందు ఫోటో', hi: 'पहले की फोटो' },
+      'After Photo': { te: 'తర్వాత ఫోటో', hi: 'बाद की फोटो' },
+      'Observations / Checklist': { te: 'పరిశీలనలు / చెక్‌లిస్ట్', hi: 'निरीक्षण / चेकलिस्ट' },
+      'Remarks': { te: 'వ్యాఖ్యలు', hi: 'टिप्पणियाँ' },
+      'Cancel': { te: 'రద్దు', hi: 'रद्द करें' },
+      'Maintenance History': { te: 'మెయింటెనెన్స్ చరిత్ర', hi: 'रखरखाव इतिहास' },
+      'View Asset Maintenance History': { te: 'ఆస్తి మెయింటెనెన్స్ చరిత్ర చూడండి', hi: 'एसेट रखरखाव इतिहास देखें' },
+      'Maintenance Hold': { te: 'మెయింటెనెన్స్ నిలిపివేత', hi: 'रखरखाव रोका गया' },
+      'Pending Tasks Assigned to You': { te: 'మీకు కేటాయించిన పెండింగ్ పనులు', hi: 'आपको दिए गए लंबित कार्य' },
+      'Enable notifications': { te: 'నోటిఫికేషన్లు ప్రారంభించండి', hi: 'सूचनाएँ चालू करें' },
+      'Maintenance Audit Reports': { te: 'మెయింటెనెన్స్ ఆడిట్ రిపోర్టులు', hi: 'रखरखाव ऑडिट रिपोर्ट' },
+      'From Date': { te: 'ప్రారంభ తేదీ', hi: 'शुरू की तारीख' },
+      'To Date': { te: 'ముగింపు తేదీ', hi: 'अंतिम तारीख' },
+      'Close': { te: 'మూసివేయి', hi: 'बंद करें' },
+      'Save': { te: 'సేవ్ చేయి', hi: 'सहेजें' },
+      'Edit': { te: 'సవరించు', hi: 'संपादित करें' },
+      'Delete': { te: 'తొలగించు', hi: 'हटाएँ' },
+      'Location': { te: 'స్థలం', hi: 'लोकेशन' },
+      'Overdue': { te: 'గడువు దాటింది', hi: 'समय सीमा पार' },
+      'Due Soon': { te: 'త్వరలో గడువు', hi: 'जल्द देय' },
+      'Healthy': { te: 'సక్రమంగా ఉంది', hi: 'ठीक है' },
+      'Admin': { te: 'అడ్మిన్', hi: 'एडमिन' },
+      'Technician': { te: 'టెక్నీషియన్', hi: 'तकनीशियन' },
+      'Show all network': { te: 'మొత్తం నెట్‌వర్క్ చూపించు', hi: 'पूरा नेटवर्क दिखाएँ' },
+      'Pending Tasks Assigned to You': { te: 'మీకు కేటాయించిన పెండింగ్ పనులు', hi: 'आपको दिए गए लंबित कार्य' },
+      'Enable phone alerts': { te: 'ఫోన్ అలర్ట్‌లు ప్రారంభించండి', hi: 'फ़ोन अलर्ट चालू करें' },
+      'Enable phone notifications': { te: 'ఫోన్ నోటిఫికేషన్‌లు ప్రారంభించండి', hi: 'फ़ोन सूचनाएँ चालू करें' },
+      'Select assets': { te: 'ఆస్తులను ఎంచుకోండి', hi: 'एसेट चुनें' },
+      'Search': { te: 'వెతకండి', hi: 'खोजें' },
+      'Healthy assets': { te: 'సక్రమంగా ఉన్న ఆస్తులు', hi: 'ठीक एसेट' },
+      'Overdue assets': { te: 'గడువు దాటిన ఆస్తులు', hi: 'समय सीमा पार एसेट' },
+      'Distance': { te: 'దూరం', hi: 'दूरी' },
+      'Asset ID': { te: 'ఆస్తి ఐడి', hi: 'एसेट आईडी' },
+      'Customer Details': { te: 'కస్టమర్ వివరాలు', hi: 'ग्राहक विवरण' },
+      'Meter Details': { te: 'మీటర్ వివరాలు', hi: 'मीटर विवरण' },
+      'Regulator Details': { te: 'రెగ్యులేటర్ వివరాలు', hi: 'रेगुलेटर विवरण' },
+      'Activity History': { te: 'కార్యకలాపాల చరిత్ర', hi: 'गतिविधि इतिहास' },
+      'Maintenance activity': { te: 'మెయింటెనెన్స్ కార్యకలాపం', hi: 'रखरखाव गतिविधि' },
+      'Submit': { te: 'సమర్పించండి', hi: 'जमा करें' },
+      'Refresh': { te: 'రిఫ్రెష్', hi: 'रीफ़्रेश' },
+      'Sync': { te: 'సింక్', hi: 'सिंक' },
+      'Technician (Locked)': { te: 'టెక్నీషియన్ (లాక్ చేయబడింది)', hi: 'तकनीशियन (लॉक)' },
+      'No image': { te: 'చిత్రం లేదు', hi: 'कोई चित्र नहीं' },
+      'View Before': { te: 'ముందు ఫోటో చూడండి', hi: 'पहले की फोटो देखें' },
+      'View After': { te: 'తర్వాత ఫోటో చూడండి', hi: 'बाद की फोटो देखें' },
+      'Active': { te: 'యాక్టివ్', hi: 'सक्रिय' },
+      'Inactive (Maintenance Hold)': { te: 'ఇన్‌యాక్టివ్ (మెయింటెనెన్స్ నిలిపివేత)', hi: 'निष्क्रिय (रखरखाव रोका गया)' },
+      'Activation Date': { te: 'యాక్టివేషన్ తేదీ', hi: 'चालू होने की तारीख' },
+      'Activation / Reconnection Date': { te: 'యాక్టివేషన్ / రీకనెక్షన్ తేదీ', hi: 'चालू / पुनः कनेक्शन की तारीख' },
+      'Add New Staff Login': { te: 'కొత్త సిబ్బంది లాగిన్ జోడించండి', hi: 'नया स्टाफ लॉगिन जोड़ें' },
+      'Admin': { te: 'అడ్మిన్', hi: 'एडमिन' },
+      'Alerts': { te: 'అలర్ట్‌లు', hi: 'अलर्ट' },
+      'Apply Filter': { te: 'ఫిల్టర్ వర్తింపజేయండి', hi: 'फ़िल्टर लागू करें' },
+      'Area': { te: 'ప్రాంతం', hi: 'क्षेत्र' },
+      'Asset Details (Tap to copy)': { te: 'ఆస్తి వివరాలు (కాపీ చేయడానికి నొక్కండి)', hi: 'एसेट विवरण (कॉपी करने के लिए टैप करें)' },
+      'Asset ID *': { te: 'ఆస్తి ఐడి *', hi: 'एसेट आईडी *' },
+      'Asset ID (Locked)': { te: 'ఆస్తి ఐడి (లాక్ చేయబడింది)', hi: 'एसेट आईडी (लॉक)' },
+      'Assign': { te: 'కేటాయించండి', hi: 'असाइन करें' },
+      'Assign Asset to Team': { te: 'ఆస్తిని టీమ్‌కు కేటాయించండి', hi: 'एसेट टीम को असाइन करें' },
+      'Assign Tasks': { te: 'పనులు కేటాయించండి', hi: 'कार्य असाइन करें' },
+      'Assign Technician (This Cycle)': { te: 'టెక్నీషియన్‌ను కేటాయించండి (ఈ సైకిల్)', hi: 'तकनीशियन असाइन करें (इस चक्र के लिए)' },
+      'Assign to Technician:': { te: 'టెక్నీషియన్‌కు కేటాయించండి:', hi: 'तकनीशियन को असाइन करें:' },
+      'Backup Database': { te: 'డేటాబేస్ బ్యాకప్', hi: 'डेटाबेस बैकअप' },
+      'Basic Details': { te: 'ప్రాథమిక వివరాలు', hi: 'बुनियादी विवरण' },
+      'Category Frequency Settings': { te: 'కేటగిరీ ఫ్రీక్వెన్సీ సెట్టింగ్‌లు', hi: 'श्रेणी अंतराल सेटिंग' },
+      'Change My Password': { te: 'నా పాస్‌వర్డ్ మార్చండి', hi: 'मेरा पासवर्ड बदलें' },
+      'Clear Drafts': { te: 'డ్రాఫ్ట్‌లను తొలగించండి', hi: 'ड्राफ़्ट साफ़ करें' },
+      'Clear Notice': { te: 'నోటీసును తొలగించండి', hi: 'सूचना हटाएँ' },
+      'Clear Tag': { te: 'ట్యాగ్ తొలగించండి', hi: 'टैग हटाएँ' },
+      'Completed Work Progress': { te: 'పూర్తి చేసిన పనుల ప్రగతి', hi: 'पूरे किए गए काम की प्रगति' },
+      'Confirm new password': { te: 'కొత్త పాస్‌వర్డ్‌ను నిర్ధారించండి', hi: 'नया पासवर्ड दोबारा दर्ज करें' },
+      'Continue an unfinished report from the sheet.': { te: 'షీట్‌లోని పూర్తి కాని రిపోర్టును కొనసాగించండి.', hi: 'शीट में अधूरी रिपोर्ट जारी रखें।' },
+      'Contractor': { te: 'కాంట్రాక్టర్', hi: 'ठेकेदार' },
+      'Create a report, save progress, or reopen a submitted report.': { te: 'రిపోర్టు సృష్టించండి, పురోగతిని సేవ్ చేయండి లేదా సమర్పించిన రిపోర్టును తిరిగి తెరవండి.', hi: 'रिपोर्ट बनाएँ, प्रगति सहेजें या जमा की गई रिपोर्ट फिर खोलें।' },
+      'Create Asset': { te: 'ఆస్తిని సృష్టించండి', hi: 'एसेट बनाएँ' },
+      'Create New Asset': { te: 'కొత్త ఆస్తిని సృష్టించండి', hi: 'नया एसेट बनाएँ' },
+      'Current password': { te: 'ప్రస్తుత పాస్‌వర్డ్', hi: 'वर्तमान पासवर्ड' },
+      'Custom': { te: 'కస్టమ్', hi: 'कस्टम' },
+      'Custom Map PNG Icons': { te: 'కస్టమ్ మ్యాప్ PNG ఐకాన్లు', hi: 'कस्टम मैप PNG आइकन' },
+      'Customer Service Status': { te: 'కస్టమర్ సర్వీస్ స్థితి', hi: 'ग्राहक सेवा स्थिति' },
+      'Date': { te: 'తేదీ', hi: 'तारीख' },
+      'Date *': { te: 'తేదీ *', hi: 'तारीख *' },
+      'Delete Asset?': { te: 'ఆస్తిని తొలగించాలా?', hi: 'एसेट हटाएँ?' },
+      'Department': { te: 'విభాగం', hi: 'विभाग' },
+      'Done': { te: 'పూర్తయింది', hi: 'हो गया' },
+      'Download CSV': { te: 'CSV డౌన్‌లోడ్ చేయండి', hi: 'CSV डाउनलोड करें' },
+      'Download Full JSON Backup': { te: 'పూర్తి JSON బ్యాకప్ డౌన్‌లోడ్ చేయండి', hi: 'पूरा JSON बैकअप डाउनलोड करें' },
+      'Drafts save automatically on this device and to the LPT sheet.': { te: 'డ్రాఫ్ట్‌లు ఈ పరికరంలో మరియు LPT షీట్‌లో ఆటోమేటిక్‌గా సేవ్ అవుతాయి.', hi: 'ड्राफ़्ट इस डिवाइस और LPT शीट में अपने आप सहेजे जाते हैं।' },
+      'Drive Photos': { te: 'డ్రైవ్ ఫోటోలు', hi: 'ड्राइव फोटो' },
+      'Export Assets Table (CSV)': { te: 'ఆస్తుల పట్టికను CSVగా ఎగుమతి చేయండి', hi: 'एसेट तालिका CSV में निर्यात करें' },
+      'Feeder / Section under LPT *': { te: 'LPT కింద ఫీడర్ / సెక్షన్ *', hi: 'LPT के अंतर्गत फीडर / सेक्शन *' },
+      'Filter completed jobs by date range (DD-MM-YYYY)': { te: 'తేదీ పరిధి ప్రకారం పూర్తయిన పనులను ఫిల్టర్ చేయండి (DD-MM-YYYY)', hi: 'तारीख सीमा से पूरे काम फ़िल्टर करें (DD-MM-YYYY)' },
+      'Final Lock Pressure': { te: 'చివరి లాక్ ప్రెషర్', hi: 'अंतिम लॉक प्रेशर' },
+      'For this beta browser only': { te: 'ఈ బీటా బ్రౌజర్‌లో మాత్రమే', hi: 'केवल इस बीटा ब्राउज़र के लिए' },
+      'Frequency (Days)': { te: 'ఫ్రీక్వెన్సీ (రోజులు)', hi: 'अंतराल (दिन)' },
+      'Import KMZ or CSV': { te: 'KMZ లేదా CSV దిగుమతి చేయండి', hi: 'KMZ या CSV आयात करें' },
+      'Inactive (Maintenance Hold)': { te: 'ఇన్‌యాక్టివ్ (మెయింటెనెన్స్ నిలిపివేత)', hi: 'निष्क्रिय (रखरखाव रोका गया)' },
+      'Initial Lock Pressure': { te: 'ప్రారంభ లాక్ ప్రెషర్', hi: 'शुरुआती लॉक प्रेशर' },
+      'Latitude': { te: 'అక్షాంశం', hi: 'अक्षांश' },
+      'Loading drafts…': { te: 'డ్రాఫ్ట్‌లు లోడ్ అవుతున్నాయి…', hi: 'ड्राफ़्ट लोड हो रहे हैं…' },
+      'Loading DRS names…': { te: 'DRS పేర్లు లోడ్ అవుతున్నాయి…', hi: 'DRS नाम लोड हो रहे हैं…' },
+      'Loading reports…': { te: 'రిపోర్టులు లోడ్ అవుతున్నాయి…', hi: 'रिपोर्ट लोड हो रही हैं…' },
+      'Location *': { te: 'స్థలం *', hi: 'लोकेशन *' },
+      'Location / Landmark': { te: 'స్థలం / ల్యాండ్‌మార్క్', hi: 'लोकेशन / लैंडमार्क' },
+      'Location / Landmark *': { te: 'స్థలం / ల్యాండ్‌మార్క్ *', hi: 'लोकेशन / लैंडमार्क *' },
+      'Lock Pressure & Readings': { te: 'లాక్ ప్రెషర్ & రీడింగ్‌లు', hi: 'लॉक प्रेशर और रीडिंग' },
+      'LPT Duration': { te: 'LPT వ్యవధి', hi: 'LPT अवधि' },
+      'New LPT Report': { te: 'కొత్త LPT రిపోర్టు', hi: 'नई LPT रिपोर्ट' },
+      'New password (at least 6 characters)': { te: 'కొత్త పాస్‌వర్డ్ (కనీసం 6 అక్షరాలు)', hi: 'नया पासवर्ड (कम से कम 6 अक्षर)' },
+      'Notice: Once maintenance is completed, this assignment tag will automatically clear.': { te: 'గమనిక: మెయింటెనెన్స్ పూర్తయిన తర్వాత ఈ అసైన్‌మెంట్ ట్యాగ్ ఆటోమేటిక్‌గా తొలగుతుంది.', hi: 'सूचना: रखरखाव पूरा होने पर यह असाइनमेंट टैग अपने आप हट जाएगा।' },
+      'Observation': { te: 'పరిశీలన', hi: 'निरीक्षण' },
+      'Observation & Verification': { te: 'పరిశీలన & ధృవీకరణ', hi: 'निरीक्षण और सत्यापन' },
+      'Open a report to review or edit it. Submitting an edit updates its report number.': { te: 'సమీక్షించడానికి లేదా సవరించడానికి రిపోర్టును తెరవండి. సవరణ సమర్పిస్తే రిపోర్టు నంబర్ అప్‌డేట్ అవుతుంది.', hi: 'रिपोर्ट देखने या संपादित करने के लिए खोलें। संपादन जमा करने पर रिपोर्ट नंबर अपडेट होगा।' },
+      'Other Maintenance — Lock Pressure Test': { te: 'ఇతర మెయింటెనెన్స్ — లాక్ ప్రెషర్ టెస్ట్', hi: 'अन्य रखरखाव — लॉक प्रेशर टेस्ट' },
+      'Photo preview': { te: 'ఫోటో ప్రివ్యూ', hi: 'फोटो पूर्वावलोकन' },
+      'Pipeline Length': { te: 'పైప్‌లైన్ పొడవు', hi: 'पाइपलाइन की लंबाई' },
+      'Prepared By': { te: 'తయారు చేసినవారు', hi: 'तैयार करने वाला' },
+      'Pressure Drop (Auto)': { te: 'ప్రెషర్ డ్రాప్ (ఆటో)', hi: 'प्रेशर ड्रॉप (ऑटो)' },
+      'Pressure Unit': { te: 'ప్రెషర్ యూనిట్', hi: 'प्रेशर इकाई' },
+      'Publish Notice': { te: 'నోటీసు ప్రచురించండి', hi: 'सूचना प्रकाशित करें' },
+      'Reading Frequency': { te: 'రీడింగ్ ఫ్రీక్వెన్సీ', hi: 'रीडिंग अंतराल' },
+      'Report / Form No.': { te: 'రిపోర్టు / ఫారం నం.', hi: 'रिपोर्ट / फ़ॉर्म नंबर' },
+      'Report Form': { te: 'రిపోర్టు ఫారం', hi: 'रिपोर्ट फ़ॉर्म' },
+      'Reset Defaults': { te: 'డిఫాల్ట్‌లకు రీసెట్ చేయండి', hi: 'डिफ़ॉल्ट रीसेट करें' },
+      'Role': { te: 'పాత్ర', hi: 'भूमिका' },
+      'Save Account': { te: 'ఖాతా సేవ్ చేయండి', hi: 'खाता सहेजें' },
+      'Save Changes': { te: 'మార్పులు సేవ్ చేయండి', hi: 'बदलाव सहेजें' },
+      'Save Draft': { te: 'డ్రాఫ్ట్ సేవ్ చేయండి', hi: 'ड्राफ़्ट सहेजें' },
+      'Save Password': { te: 'పాస్‌వర్డ్ సేవ్ చేయండి', hi: 'पासवर्ड सहेजें' },
+      'Save Team': { te: 'టీమ్ సేవ్ చేయండి', hi: 'टीम सहेजें' },
+      'Saved Drafts': { te: 'సేవ్ చేసిన డ్రాఫ్ట్‌లు', hi: 'सहेजे गए ड्राफ़्ट' },
+      'Section / SR Details': { te: 'సెక్షన్ / SR వివరాలు', hi: 'सेक्शन / SR विवरण' },
+      'Select New Team': { te: 'కొత్త టీమ్ ఎంచుకోండి', hi: 'नई टीम चुनें' },
+      'Select Technician': { te: 'టెక్నీషియన్‌ను ఎంచుకోండి', hi: 'तकनीशियन चुनें' },
+      'Send reminder to': { te: 'రిమైండర్ పంపండి:', hi: 'रिमाइंडर भेजें:' },
+      'Set maintenance intervals (in days) and batch apply to all assets in that category:': { te: 'మెయింటెనెన్స్ వ్యవధిని (రోజుల్లో) సెట్ చేసి ఆ కేటగిరీలోని అన్ని ఆస్తులకు వర్తింపజేయండి:', hi: 'रखरखाव अंतराल (दिनों में) सेट करें और उस श्रेणी के सभी एसेट पर लागू करें:' },
+      'Showing assets for your team': { te: 'మీ టీమ్ ఆస్తులు చూపిస్తున్నాయి', hi: 'आपकी टीम के एसेट दिखाए जा रहे हैं' },
+      'Start a report. Your work is saved on this device while you fill it in.': { te: 'రిపోర్టు ప్రారంభించండి. నింపుతున్నప్పుడు మీ పని ఈ పరికరంలో సేవ్ అవుతుంది.', hi: 'रिपोर्ट शुरू करें। भरते समय आपका काम इस डिवाइस में सहेजा जाएगा।' },
+      'Submit & Generate PDF': { te: 'సమర్పించి PDF తయారు చేయండి', hi: 'जमा करें और PDF बनाएँ' },
+      'Submitted Reports': { te: 'సమర్పించిన రిపోర్టులు', hi: 'जमा की गई रिपोर्ट' },
+      'Sync All Assets to Google Sheet': { te: 'అన్ని ఆస్తులను Google Sheet‌కు సింక్ చేయండి', hi: 'सभी एसेट Google Sheet से सिंक करें' },
+      'Syncing Assets with Cloud...': { te: 'ఆస్తులు క్లౌడ్‌తో సింక్ అవుతున్నాయి...', hi: 'एसेट क्लाउड से सिंक हो रहे हैं...' },
+      'Tap row to copy': { te: 'కాపీ చేయడానికి వరుసను నొక్కండి', hi: 'कॉपी करने के लिए पंक्ति टैप करें' },
+      'Team *': { te: 'టీమ్ *', hi: 'टीम *' },
+      'Technician Reminder': { te: 'టెక్నీషియన్ రిమైండర్', hi: 'तकनीशियन रिमाइंडर' },
+      'Test Start / Valve Closing *': { te: 'టెస్ట్ ప్రారంభం / వాల్వ్ క్లోజింగ్ *', hi: 'टेस्ट शुरू / वाल्व बंद *' },
+      'Test Timing': { te: 'టెస్ట్ సమయం', hi: 'टेस्ट का समय' },
+      'This asset will instantly be transferred to the selected team\'s zone and field roster.': { te: 'ఈ ఆస్తి ఎంచుకున్న టీమ్ జోన్ మరియు ఫీల్డ్ జాబితాకు వెంటనే బదిలీ అవుతుంది.', hi: 'यह एसेट तुरंत चुनी गई टीम के ज़ोन और फील्ड सूची में स्थानांतरित होगा।' },
+      'Total Readings': { te: 'మొత్తం రీడింగ్‌లు', hi: 'कुल रीडिंग' },
+      'Total Test Time': { te: 'మొత్తం టెస్ట్ సమయం', hi: 'कुल टेस्ट समय' },
+      'Type *': { te: 'రకం *', hi: 'प्रकार *' },
+      'Upload custom PNG icons to display on the GIS map for each category': { te: 'ప్రతి కేటగిరీకి GIS మ్యాప్‌లో చూపించడానికి కస్టమ్ PNG ఐకాన్లు అప్‌లోడ్ చేయండి', hi: 'हर श्रेणी के लिए GIS मैप पर दिखाने हेतु कस्टम PNG आइकन अपलोड करें' },
+      'Valve Opening (Auto)': { te: 'వాల్వ్ ఓపెనింగ్ (ఆటో)', hi: 'वाल्व खुलना (ऑटो)' },
+      'Verified By': { te: 'ధృవీకరించినవారు', hi: 'सत्यापित करने वाला' }
+    };
+    const languageNames = { en: 'English', te: 'తెలుగు', hi: 'हिन्दी' };
+    const originalTextNodes = new WeakMap();
+    const lastTranslatedText = new WeakMap();
+    const originalAttributes = new WeakMap();
+    let interfaceLanguage = 'en';
+    let translationScheduled = false;
+
+    function translateValue(value, language) {
+      const key = String(value || '').replace(/\s+/g, ' ').trim();
+      if (language === 'en' || !UI_TRANSLATIONS[key]) return value;
+      const translated = UI_TRANSLATIONS[key][language];
+      if (!translated) return value;
+      const leading = String(value).match(/^\s*/)?.[0] || '';
+      const trailing = String(value).match(/\s*$/)?.[0] || '';
+      return leading + translated + trailing;
+    }
+
+    function translatePage(language = interfaceLanguage) {
+      interfaceLanguage = languageNames[language] ? language : 'en';
+      document.documentElement.lang = interfaceLanguage;
+      const label = document.getElementById('currentLanguageLabel');
+      if (label) label.textContent = languageNames[interfaceLanguage];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const parentTag = node.parentElement?.tagName;
+        if (parentTag === 'SCRIPT' || parentTag === 'STYLE' || parentTag === 'TEXTAREA' || node.parentElement?.id === 'currentLanguageLabel') continue;
+        const current = node.nodeValue;
+        let original = originalTextNodes.get(node);
+        if (original === undefined || (current !== lastTranslatedText.get(node) && current !== original)) {
+          original = current;
+          originalTextNodes.set(node, original);
+        }
+        const translated = translateValue(original, interfaceLanguage);
+        if (current !== translated) node.nodeValue = translated;
+        lastTranslatedText.set(node, translated);
+      }
+
+      document.querySelectorAll('[placeholder],[title],[aria-label]').forEach(element => {
+        let saved = originalAttributes.get(element);
+        if (!saved) { saved = {}; originalAttributes.set(element, saved); }
+        ['placeholder', 'title', 'aria-label'].forEach(attribute => {
+          if (!element.hasAttribute(attribute)) return;
+          const current = element.getAttribute(attribute);
+          if (saved[attribute] === undefined || (current !== saved[attribute].last && current !== saved[attribute].original)) {
+            saved[attribute] = { original: current, last: current };
+          }
+          const translated = translateValue(saved[attribute].original, interfaceLanguage);
+          element.setAttribute(attribute, translated);
+          saved[attribute].last = translated;
+        });
+      });
+    }
+
+    function toggleLanguageMenu() {
+      const menu = document.getElementById('languageMenu');
+      const button = document.getElementById('languageButton');
+      const opening = menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', !opening);
+      button.setAttribute('aria-expanded', String(opening));
+    }
+
+    function setInterfaceLanguage(language) {
+      interfaceLanguage = languageNames[language] ? language : 'en';
+      safeStore.set('bgl_beta_language', interfaceLanguage);
+      translatePage(interfaceLanguage);
+      document.getElementById('languageMenu').classList.add('hidden');
+      document.getElementById('languageButton').setAttribute('aria-expanded', 'false');
+    }
+
+    document.addEventListener('click', event => {
+      const selector = document.getElementById('languageSelector');
+      if (selector && !selector.contains(event.target)) {
+        document.getElementById('languageMenu').classList.add('hidden');
+        document.getElementById('languageButton').setAttribute('aria-expanded', 'false');
+      }
+    });
+    const translationObserver = new MutationObserver(() => {
+      if (translationScheduled) return;
+      translationScheduled = true;
+      requestAnimationFrame(() => { translationScheduled = false; translatePage(interfaceLanguage); });
+    });
+    translationObserver.observe(document.body, { childList: true, characterData: true, subtree: true });
+    setInterfaceLanguage(safeStore.get('bgl_beta_language') || 'en');
   </script>
 </body>
 </html>
