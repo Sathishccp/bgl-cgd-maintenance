@@ -956,6 +956,18 @@
         </div>
         <button onclick="closeModal('progressModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+        <label class="text-[11px] text-slate-400">Asset category
+          <select id="progressCategoryFilter" onchange="renderProgressItems()" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs">
+            <option value="All">All categories</option>
+          </select>
+        </label>
+        <label id="progressTechnicianFilterWrap" class="hidden text-[11px] text-slate-400">Technician
+          <select id="progressTechnicianFilter" onchange="renderProgressItems()" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs">
+            <option value="All">All technicians</option>
+          </select>
+        </label>
+      </div>
       <div class="space-y-2.5" id="progressItemsContainer"></div>
     </div>
   </div>
@@ -3732,33 +3744,109 @@
       openModal('assetHistoryModal');
     }
 
-    function openProgressModal() {
+    function progressDateValue(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return 0;
+      const ymd = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (ymd) return Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+      const dmy = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+      if (dmy) return Date.UTC(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+      const parsed = Date.parse(raw);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function progressJobType(job) {
+      const linkedAsset = assets.find(asset => sanitizeKey(asset.id) === sanitizeKey(job.assetId));
+      return String(job.assetType || job.type || linkedAsset?.type || '').trim();
+    }
+
+    function renderProgressItems() {
       const container = document.getElementById('progressItemsContainer');
-      container.innerHTML = '';
-      const userJobs = maintenanceHistory.filter(h => currentUser.role === 'admin' ? true : h.tech === currentUser.name);
+      const categoryFilter = document.getElementById('progressCategoryFilter')?.value || 'All';
+      const technicianFilter = document.getElementById('progressTechnicianFilter')?.value || 'All';
+      const isAdmin = currentUser?.role === 'admin';
+      const currentTechKeys = [currentUser?.name, currentUser?.id].map(sanitizeKey).filter(Boolean);
+      const filteredJobs = maintenanceHistory.filter(job => {
+        const jobTech = sanitizeKey(job.tech || job.technician || job.techId || '');
+        if (!isAdmin && !currentTechKeys.includes(jobTech)) return false;
+        if (categoryFilter !== 'All' && progressJobType(job).toLowerCase() !== categoryFilter.toLowerCase()) return false;
+        if (isAdmin && technicianFilter !== 'All' && sanitizeKey(job.tech || job.technician || job.techId || '') !== sanitizeKey(technicianFilter)) return false;
+        return true;
+      }).sort((a, b) => progressDateValue(b.date) - progressDateValue(a.date));
 
-      document.getElementById('progressSubTitle').textContent = `Completed Tasks: ${userJobs.length}`;
-
-      if (!userJobs.length) {
-        container.innerHTML = '<div class="text-center text-slate-500 py-6">No maintenance logged yet.</div>';
-      } else {
-        userJobs.forEach(job => {
-          const card = document.createElement('div');
-          card.className = 'p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5 text-xs';
-          card.innerHTML = `
-            <div class="flex justify-between items-center">
-              <span class="font-bold text-white">${job.assetId}</span>
-              <span class="text-[11px] text-teal-400 font-mono">${formatToDDMMYYYY(job.date)}</span>
-            </div>
-            <p class="text-slate-400 text-[11px]"><b>Observations:</b> ${job.observations || 'N/A'}</p>
-            <div class="flex items-center gap-3 pt-1">
-              ${getPhotoLink(job.beforePhoto) ? `<a href="${getPhotoLink(job.beforePhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View Before Photo</a>` : (job.beforePhoto ? '<span class="text-xs text-slate-500">Before photo link unavailable</span>' : '')}
-              ${getPhotoLink(job.afterPhoto) ? `<a href="${getPhotoLink(job.afterPhoto)}" target="_blank" rel="noopener" class="text-xs text-teal-400 underline">View After Photo</a>` : (job.afterPhoto ? '<span class="text-xs text-slate-500">After photo link unavailable</span>' : '')}
-            </div>
-          `;
-          container.appendChild(card);
-        });
+      document.getElementById('progressSubTitle').textContent = `Completed Tasks: ${filteredJobs.length}`;
+      container.replaceChildren();
+      if (!filteredJobs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-center text-slate-500 py-6';
+        empty.textContent = 'No maintenance records match these filters.';
+        container.appendChild(empty);
+        return;
       }
+
+      filteredJobs.forEach(job => {
+        const card = document.createElement('div');
+        card.className = 'p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5 text-xs';
+        const heading = document.createElement('div');
+        heading.className = 'flex justify-between items-center gap-2';
+        const asset = document.createElement('span');
+        asset.className = 'font-bold text-white';
+        asset.textContent = String(job.assetId || 'Asset');
+        const date = document.createElement('span');
+        date.className = 'text-[11px] text-teal-400 font-mono';
+        date.textContent = formatToDDMMYYYY(job.date);
+        heading.append(asset, date);
+        card.appendChild(heading);
+        if (isAdmin) {
+          const tech = document.createElement('p');
+          tech.className = 'text-slate-400 text-[11px]';
+          tech.textContent = `Technician: ${job.tech || job.technician || job.techId || 'Unknown'}`;
+          card.appendChild(tech);
+        }
+        const observations = document.createElement('p');
+        observations.className = 'text-slate-400 text-[11px]';
+        const label = document.createElement('b');
+        label.textContent = 'Observations: ';
+        observations.append(label, document.createTextNode(String(job.observations || 'N/A')));
+        card.appendChild(observations);
+        const links = document.createElement('div');
+        links.className = 'flex items-center gap-3 pt-1';
+        [['beforePhoto', 'View Before Photo'], ['afterPhoto', 'View After Photo']].forEach(([key, labelText]) => {
+          if (!job[key]) return;
+          const href = getPhotoLink(job[key]);
+          if (!href) return;
+          const link = document.createElement('a');
+          link.href = href; link.target = '_blank'; link.rel = 'noopener';
+          link.className = 'text-xs text-teal-400 underline';
+          link.textContent = labelText;
+          links.appendChild(link);
+        });
+        if (links.childElementCount) card.appendChild(links);
+        container.appendChild(card);
+      });
+    }
+
+    function openProgressModal() {
+      const categorySelect = document.getElementById('progressCategoryFilter');
+      const selectedCategory = categorySelect.value || 'All';
+      categorySelect.replaceChildren(new Option('All categories', 'All'), ...CATEGORIES.map(category => new Option(category, category)));
+      categorySelect.value = CATEGORIES.includes(selectedCategory) ? selectedCategory : 'All';
+
+      const techWrap = document.getElementById('progressTechnicianFilterWrap');
+      const techSelect = document.getElementById('progressTechnicianFilter');
+      if (currentUser?.role === 'admin') {
+        techWrap.classList.remove('hidden');
+        const previousTech = techSelect.value || 'All';
+        const techNames = [...new Set(maintenanceHistory.map(job => String(job.tech || job.technician || job.techId || '').trim()).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b));
+        techSelect.replaceChildren(new Option('All technicians', 'All'), ...techNames.map(name => new Option(name, name)));
+        techSelect.value = techNames.some(name => sanitizeKey(name) === sanitizeKey(previousTech)) ? techNames.find(name => sanitizeKey(name) === sanitizeKey(previousTech)) : 'All';
+      } else {
+        techWrap.classList.add('hidden');
+        techSelect.replaceChildren(new Option('All technicians', 'All'));
+        techSelect.value = 'All';
+      }
+      renderProgressItems();
       openModal('progressModal');
     }
 
