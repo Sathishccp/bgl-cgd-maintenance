@@ -1282,6 +1282,7 @@
     let teams = [];
     let cloudTechnicians = [];
     let cloudUsersLoaded = false;
+    let startupCloudLoadPending = true;
     let customIcons = {};
     let currentUser = null;
     let adminSessionToken = sessionStorage.getItem('bgl_admin_session') || '';
@@ -1333,6 +1334,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       safeStore.remove('bgl_custom_passwords');
       loadStoredAppData();
+      fetchCloudData(false);
       checkSession();
       if (currentUser) restoreMaintenanceDraftOnStartup();
       renderCustomIconsModal();
@@ -1341,7 +1343,6 @@
       const newActivationInput = document.getElementById('newAssetActivationDate');
       if (newActivationInput) newActivationInput.value = localDateKey();
       toggleActivationDateField('new');
-      fetchCloudData(false);
       setInterval(() => { if (currentUser && currentUser.role !== 'admin') fetchTechnicianNotices(); }, 60000);
       setInterval(() => { if (currentUser) fetchCloudIcons(false); }, 60000);
     });
@@ -1524,10 +1525,12 @@
       }
 
       checkActiveNotice();
-      try { initMap(); } catch(err) { console.error("Map init error:", err); }
-      try { renderAssets(); } catch(err) { console.error("Assets render error:", err); }
-      try { updateKPIDashboard(); } catch(err) { console.error("KPI error:", err); }
-      try { updateSelectedAssetsUI(); } catch(err) { console.error("Bulk assignment UI error:", err); }
+      if (!startupCloudLoadPending) {
+        try { initMap(); } catch(err) { console.error("Map init error:", err); }
+        try { renderAssets(); } catch(err) { console.error("Assets render error:", err); }
+        try { updateKPIDashboard(); } catch(err) { console.error("KPI error:", err); }
+        try { updateSelectedAssetsUI(); } catch(err) { console.error("Bulk assignment UI error:", err); }
+      }
     }
 
     // --- ADMIN USER & PASSWORD MANAGER ---
@@ -4120,11 +4123,19 @@
 
           if (showFeedback) showToast("Cloud Assets Synced Successfully!");
           checkActiveNotice(true);
-          if (currentUser) { renderTechPendingTasks(); renderAssets(); }
+          if (currentUser && !startupCloudLoadPending) { renderTechPendingTasks(); renderAssets(); }
         }
       } catch (err) {
         console.warn("Using local cached records", err);
       } finally {
+        if (startupCloudLoadPending) {
+          startupCloudLoadPending = false;
+          if (currentUser) {
+            try { initMap(); } catch(err) { console.error("Map init error:", err); }
+            try { renderTechPendingTasks(); renderAssets(); updateKPIDashboard(); updateSelectedAssetsUI(); }
+            catch(err) { console.error("Initial app render error:", err); }
+          }
+        }
         hideLoader();
       }
     }
@@ -4417,10 +4428,16 @@
         const json = await res.json();
         if (!res.ok || json.status !== 'success') throw new Error(json.message || 'Could not load shared icons');
         if (json.iconsInitialized && Array.isArray(json.icons)) {
-          customIcons = Object.fromEntries(json.icons.filter(icon => icon.category && icon.dataUri).map(icon => [icon.category, icon.dataUri]));
-          safeStore.set('bgl_custom_png_icons', JSON.stringify(customIcons));
-          renderCustomIconsModal();
-          renderAssets();
+          const nextIcons = Object.fromEntries(json.icons.filter(icon => icon.category && icon.dataUri).map(icon => [icon.category, icon.dataUri]));
+          const oldKeys = Object.keys(customIcons).sort();
+          const newKeys = Object.keys(nextIcons).sort();
+          const changed = oldKeys.length !== newKeys.length || oldKeys.some((key, index) => key !== newKeys[index] || customIcons[key] !== nextIcons[key]);
+          customIcons = nextIcons;
+          if (changed) {
+            safeStore.set('bgl_custom_png_icons', JSON.stringify(customIcons));
+            renderCustomIconsModal();
+            renderAssets();
+          }
         } else if (currentUser && currentUser.role === 'admin' && Object.keys(customIcons).length) {
           await postCloudAction({ action: 'syncIcons', icons: Object.entries(customIcons).map(([category, dataUri]) => ({ category, dataUri })) });
           if (showFeedback) showToast('Existing device icons shared to cloud');
