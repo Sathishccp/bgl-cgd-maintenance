@@ -320,6 +320,10 @@
             <tbody id="assetsTableBody" class="divide-y divide-slate-800/60 text-slate-300"></tbody>
           </table>
         </div>
+        <div id="assetRenderPager" class="hidden border-t border-slate-800 px-3 py-3 flex-col sm:flex-row items-center justify-between gap-2">
+          <span id="assetRenderSummary" class="text-xs text-slate-400"></span>
+          <button id="loadMoreAssetsButton" type="button" onclick="loadMoreAssets()" class="hidden px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-teal-300 text-xs font-semibold">Load more assets</button>
+        </div>
       </div>
       </div>
     </main>
@@ -958,17 +962,18 @@
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         <label class="text-[11px] text-slate-400">Asset category
-          <select id="progressCategoryFilter" onchange="renderProgressItems()" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs">
+          <select id="progressCategoryFilter" onchange="renderProgressItems(true)" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs">
             <option value="All">All categories</option>
           </select>
         </label>
         <label id="progressTechnicianFilterWrap" class="hidden text-[11px] text-slate-400">Technician
-          <select id="progressTechnicianFilter" onchange="renderProgressItems()" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs">
+          <select id="progressTechnicianFilter" onchange="renderProgressItems(true)" class="mt-1 w-full p-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs">
             <option value="All">All technicians</option>
           </select>
         </label>
       </div>
       <div class="space-y-2.5" id="progressItemsContainer"></div>
+      <button id="progressLoadMore" type="button" onclick="renderProgressItems(false, true)" class="hidden mt-3 w-full p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold"></button>
     </div>
   </div>
 
@@ -1147,6 +1152,11 @@
     let activeStatusFilter = null;
     let searchQuery = '';
     let showAllTeams = false;
+    const ASSET_ROWS_PER_PAGE = 30;
+    const ASSET_RENDER_CHUNK_SIZE = 6;
+    let renderedAssetCount = 0;
+    let assetRenderToken = 0;
+    let assetRenderPending = false;
     let userLocation = null;
     let map = null;
     let markersLayer = null;
@@ -1882,8 +1892,12 @@
       return { status: 'Healthy', color: '#14b8a6', badge: 'bg-teal-500/20 text-teal-300 border border-teal-500/40', dueDateFormatted: formattedDue };
     }
 
-    function getDistance(lat1, lon1, lat2, lon2) {
-      if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    function getDistanceKm(lat1, lon1, lat2, lon2) {
+      const rawCoordinates = [lat1, lon1, lat2, lon2];
+      if (rawCoordinates.some(value => value === null || value === undefined || String(value).trim() === '')) return null;
+      const coordinates = rawCoordinates.map(Number);
+      if (coordinates.some(value => !Number.isFinite(value)) || Math.abs(coordinates[0]) > 90 || Math.abs(coordinates[2]) > 90 || Math.abs(coordinates[1]) > 180 || Math.abs(coordinates[3]) > 180) return null;
+      [lat1, lon1, lat2, lon2] = coordinates;
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -1891,8 +1905,18 @@
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon/2) * Math.sin(dLon/2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      const d = R * c;
+      return R * c;
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const d = getDistanceKm(lat1, lon1, lat2, lon2);
+      if (d === null) return null;
       return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(2)} km`;
+    }
+
+    function getAssetStatusSortRank(asset) {
+      const rank = { 'Overdue': 0, 'Due Soon': 1, 'Healthy': 2, 'Maintenance Hold': 3, 'No Log': 4 };
+      return rank[computeAssetStatus(asset).status] ?? 5;
     }
 
     function copyAssetDetails(assetId, location) {
@@ -1911,11 +1935,17 @@
     }
 
     // --- RENDER ASSETS & MAP ---
-    function renderAssets() {
+    function renderAssets(append = false) {
       const tbody = document.getElementById('assetsTableBody');
       if (!tbody) return;
-      tbody.innerHTML = '';
-      if (markersLayer) markersLayer.clearLayers();
+      if (append && assetRenderPending) return;
+      const renderToken = ++assetRenderToken;
+      assetRenderPending = true;
+      if (!append) {
+        tbody.innerHTML = '';
+        renderedAssetCount = 0;
+        if (markersLayer) markersLayer.clearLayers();
+      }
 
       // Ensure uniqueness before rendering
       assets = deduplicateAssets(assets);
@@ -1940,15 +1970,19 @@
 
       if (userLocation) {
         filtered.sort((a, b) => {
-          const dA = (a.lat && a.lng) ? Math.hypot(a.lat - userLocation.lat, a.lng - userLocation.lng) : 999999;
-          const dB = (b.lat && b.lng) ? Math.hypot(b.lat - userLocation.lat, b.lng - userLocation.lng) : 999999;
-          return dA - dB;
+          const distanceA = getDistanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) ?? Number.POSITIVE_INFINITY;
+          const distanceB = getDistanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng) ?? Number.POSITIVE_INFINITY;
+          if (distanceA !== distanceB) return distanceA - distanceB;
+          return getAssetStatusSortRank(a) - getAssetStatusSortRank(b);
         });
+      } else {
+        filtered.sort((a, b) => getAssetStatusSortRank(a) - getAssetStatusSortRank(b));
       }
 
       document.getElementById('assetCountBadge').textContent = filtered.length;
+      const pageAssets = filtered.slice(renderedAssetCount, renderedAssetCount + ASSET_ROWS_PER_PAGE);
 
-      filtered.forEach(asset => {
+      const renderOneAsset = asset => {
         const info = computeAssetStatus(asset);
         let dist = userLocation ? getDistance(userLocation.lat, userLocation.lng, asset.lat, asset.lng) : '--';
 
@@ -2048,9 +2082,39 @@
           </td>
         `;
         tbody.appendChild(tr);
-      });
+      };
 
-      updateKPIDashboard();
+      let pageIndex = 0;
+      const renderChunk = () => {
+        if (renderToken !== assetRenderToken) return;
+        const chunkStart = pageIndex;
+        const chunkEnd = Math.min(chunkStart + ASSET_RENDER_CHUNK_SIZE, pageAssets.length);
+        while (pageIndex < chunkEnd) renderOneAsset(pageAssets[pageIndex++]);
+        renderedAssetCount += chunkEnd - chunkStart;
+
+        if (pageIndex < pageAssets.length) {
+          requestAnimationFrame(renderChunk);
+          return;
+        }
+
+        assetRenderPending = false;
+        const pager = document.getElementById('assetRenderPager');
+        const summary = document.getElementById('assetRenderSummary');
+        const moreButton = document.getElementById('loadMoreAssetsButton');
+        if (pager && summary && moreButton) {
+          pager.classList.remove('hidden');
+          pager.classList.add('flex');
+          summary.textContent = `Showing ${renderedAssetCount} of ${filtered.length} assets. More rows and map markers load in batches.`;
+          moreButton.textContent = `Load ${Math.min(ASSET_ROWS_PER_PAGE, filtered.length - renderedAssetCount)} more assets`;
+          moreButton.classList.toggle('hidden', renderedAssetCount >= filtered.length);
+        }
+        updateKPIDashboard();
+      };
+      requestAnimationFrame(renderChunk);
+    }
+
+    function loadMoreAssets() {
+      renderAssets(true);
     }
 
     // --- ASSET EDIT & DELETE ---
@@ -3646,28 +3710,39 @@
       return Number.isNaN(parsed) ? 0 : parsed;
     }
 
-    function progressJobType(job) {
-      const linkedAsset = assets.find(asset => sanitizeKey(asset.id) === sanitizeKey(job.assetId));
-      return String(job.assetType || job.type || linkedAsset?.type || '').trim();
+    const PROGRESS_PAGE_SIZE = 50;
+    let progressVisibleCount = PROGRESS_PAGE_SIZE;
+
+    function progressJobType(job, assetTypes) {
+      const linkedAssetType = assetTypes.get(sanitizeKey(job.assetId));
+      return String(job.assetType || job.type || linkedAssetType || '').trim();
     }
 
-    function renderProgressItems() {
+    function renderProgressItems(resetVisible = false, loadMore = false) {
       const container = document.getElementById('progressItemsContainer');
+      const loadMoreButton = document.getElementById('progressLoadMore');
+      if (resetVisible) progressVisibleCount = PROGRESS_PAGE_SIZE;
+      else if (loadMore) progressVisibleCount += PROGRESS_PAGE_SIZE;
       const categoryFilter = document.getElementById('progressCategoryFilter')?.value || 'All';
       const technicianFilter = document.getElementById('progressTechnicianFilter')?.value || 'All';
       const isAdmin = currentUser?.role === 'admin';
       const currentTechKeys = [currentUser?.name, currentUser?.id].map(sanitizeKey).filter(Boolean);
+      const assetTypes = new Map(assets.map(asset => [sanitizeKey(asset.id), asset.type]));
       const filteredJobs = maintenanceHistory.filter(job => {
         const jobTech = sanitizeKey(job.tech || job.technician || job.techId || '');
         if (!isAdmin && !currentTechKeys.includes(jobTech)) return false;
-        if (categoryFilter !== 'All' && progressJobType(job).toLowerCase() !== categoryFilter.toLowerCase()) return false;
+        if (categoryFilter !== 'All' && progressJobType(job, assetTypes).toLowerCase() !== categoryFilter.toLowerCase()) return false;
         if (isAdmin && technicianFilter !== 'All' && sanitizeKey(job.tech || job.technician || job.techId || '') !== sanitizeKey(technicianFilter)) return false;
         return true;
       }).sort((a, b) => progressDateValue(b.date) - progressDateValue(a.date));
 
-      document.getElementById('progressSubTitle').textContent = `Completed Tasks: ${filteredJobs.length}`;
+      const visibleJobs = filteredJobs.slice(0, progressVisibleCount);
+      document.getElementById('progressSubTitle').textContent = filteredJobs.length > PROGRESS_PAGE_SIZE
+        ? `Completed Tasks: ${filteredJobs.length} · Showing ${visibleJobs.length}`
+        : `Completed Tasks: ${filteredJobs.length}`;
       container.replaceChildren();
       if (!filteredJobs.length) {
+        loadMoreButton.classList.add('hidden');
         const empty = document.createElement('div');
         empty.className = 'text-center text-slate-500 py-6';
         empty.textContent = 'No maintenance records match these filters.';
@@ -3675,7 +3750,7 @@
         return;
       }
 
-      filteredJobs.forEach(job => {
+      visibleJobs.forEach(job => {
         const card = document.createElement('div');
         card.className = 'p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5 text-xs';
         const heading = document.createElement('div');
@@ -3715,6 +3790,14 @@
         if (links.childElementCount) card.appendChild(links);
         container.appendChild(card);
       });
+
+      const remaining = filteredJobs.length - visibleJobs.length;
+      if (remaining > 0) {
+        loadMoreButton.textContent = `Load ${Math.min(PROGRESS_PAGE_SIZE, remaining)} more (${remaining} remaining)`;
+        loadMoreButton.classList.remove('hidden');
+      } else {
+        loadMoreButton.classList.add('hidden');
+      }
     }
 
     function openProgressModal() {
@@ -3737,7 +3820,7 @@
         techSelect.replaceChildren(new Option('All technicians', 'All'));
         techSelect.value = 'All';
       }
-      renderProgressItems();
+      renderProgressItems(true);
       openModal('progressModal');
     }
 
