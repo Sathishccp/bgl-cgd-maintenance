@@ -1152,9 +1152,10 @@
     let activeStatusFilter = null;
     let searchQuery = '';
     let showAllTeams = false;
-    const ASSET_ROWS_PER_PAGE = 30;
     const ASSET_RENDER_CHUNK_SIZE = 6;
     let renderedAssetCount = 0;
+    // Start with overdue work; each explicit Load More adds the next urgency group.
+    let assetLoadStage = 0;
     let assetRenderToken = 0;
     let assetRenderPending = false;
     let userLocation = null;
@@ -1965,6 +1966,12 @@
           const matchTech = (a.assignedTech || '').toLowerCase().includes(q);
           if (!matchId && !matchRegistration && !matchLoc && !matchTeam && !matchTech) return false;
         }
+        // Searches and explicit KPI filters should be able to reach every matching asset.
+        if (!activeStatusFilter && !searchQuery) {
+          const status = computeAssetStatus(a).status;
+          if (assetLoadStage === 0 && status !== 'Overdue') return false;
+          if (assetLoadStage === 1 && status !== 'Overdue' && status !== 'Due Soon') return false;
+        }
         return true;
       });
 
@@ -1980,7 +1987,7 @@
       }
 
       document.getElementById('assetCountBadge').textContent = filtered.length;
-      const pageAssets = filtered.slice(renderedAssetCount, renderedAssetCount + ASSET_ROWS_PER_PAGE);
+      const pageAssets = filtered.slice(renderedAssetCount);
 
       const renderOneAsset = asset => {
         const info = computeAssetStatus(asset);
@@ -2102,11 +2109,17 @@
         const summary = document.getElementById('assetRenderSummary');
         const moreButton = document.getElementById('loadMoreAssetsButton');
         if (pager && summary && moreButton) {
-          pager.classList.remove('hidden');
-          pager.classList.add('flex');
-          summary.textContent = `Showing ${renderedAssetCount} of ${filtered.length} assets. More rows and map markers load in batches.`;
-          moreButton.textContent = `Load ${Math.min(ASSET_ROWS_PER_PAGE, filtered.length - renderedAssetCount)} more assets`;
-          moreButton.classList.toggle('hidden', renderedAssetCount >= filtered.length);
+          const stagedView = !activeStatusFilter && !searchQuery;
+          const canLoadMore = stagedView && assetLoadStage < 2;
+          pager.classList.toggle('hidden', !canLoadMore);
+          pager.classList.toggle('flex', canLoadMore);
+          summary.textContent = assetLoadStage === 0
+            ? `Showing all ${renderedAssetCount} overdue assets.`
+            : assetLoadStage === 1
+              ? `Showing all ${renderedAssetCount} overdue and due soon assets.`
+              : `Showing all ${renderedAssetCount} assets.`;
+          moreButton.textContent = assetLoadStage === 0 ? 'Load Due Soon Assets' : 'Load Healthy Assets';
+          moreButton.classList.toggle('hidden', !canLoadMore);
         }
         updateKPIDashboard();
       };
@@ -2114,7 +2127,9 @@
     }
 
     function loadMoreAssets() {
-      renderAssets(true);
+      if (activeStatusFilter || searchQuery || assetLoadStage >= 2) return;
+      assetLoadStage += 1;
+      renderAssets();
     }
 
     // --- ASSET EDIT & DELETE ---
@@ -2192,6 +2207,7 @@
     function setStatusFilter(status) {
       // Clicking the active KPI again clears that status filter.
       activeStatusFilter = activeStatusFilter === status ? null : status;
+      if (!activeStatusFilter) assetLoadStage = 0;
       const cardIds = ['kpiCardTotal', 'kpiCardHealthy', 'kpiCardDueSoon', 'kpiCardOverdue'];
       cardIds.forEach(id => {
         const card = document.getElementById(id);
