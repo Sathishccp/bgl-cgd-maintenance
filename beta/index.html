@@ -2035,8 +2035,12 @@
       return { status: 'Healthy', color: '#14b8a6', badge: 'bg-teal-500/20 text-teal-300 border border-teal-500/40', dueDateFormatted: formattedDue };
     }
 
-    function getDistance(lat1, lon1, lat2, lon2) {
-      if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    function getDistanceKm(lat1, lon1, lat2, lon2) {
+      const rawCoordinates = [lat1, lon1, lat2, lon2];
+      if (rawCoordinates.some(value => value === null || value === undefined || String(value).trim() === '')) return null;
+      const coordinates = rawCoordinates.map(Number);
+      if (coordinates.some(value => !Number.isFinite(value)) || Math.abs(coordinates[0]) > 90 || Math.abs(coordinates[2]) > 90 || Math.abs(coordinates[1]) > 180 || Math.abs(coordinates[3]) > 180) return null;
+      [lat1, lon1, lat2, lon2] = coordinates;
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -2044,8 +2048,18 @@
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon/2) * Math.sin(dLon/2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      const d = R * c;
+      return R * c;
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const d = getDistanceKm(lat1, lon1, lat2, lon2);
+      if (d === null) return null;
       return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(2)} km`;
+    }
+
+    function getAssetStatusSortRank(asset) {
+      const rank = { 'Overdue': 0, 'Due Soon': 1, 'Healthy': 2, 'Maintenance Hold': 3, 'No Log': 4 };
+      return rank[computeAssetStatus(asset).status] ?? 5;
     }
 
     function copyAssetDetails(assetId, location) {
@@ -2093,10 +2107,13 @@
 
       if (userLocation) {
         filtered.sort((a, b) => {
-          const dA = (a.lat && a.lng) ? Math.hypot(a.lat - userLocation.lat, a.lng - userLocation.lng) : 999999;
-          const dB = (b.lat && b.lng) ? Math.hypot(b.lat - userLocation.lat, b.lng - userLocation.lng) : 999999;
-          return dA - dB;
+          const distanceA = getDistanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) ?? Number.POSITIVE_INFINITY;
+          const distanceB = getDistanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng) ?? Number.POSITIVE_INFINITY;
+          if (distanceA !== distanceB) return distanceA - distanceB;
+          return getAssetStatusSortRank(a) - getAssetStatusSortRank(b);
         });
+      } else {
+        filtered.sort((a, b) => getAssetStatusSortRank(a) - getAssetStatusSortRank(b));
       }
 
       document.getElementById('assetCountBadge').textContent = filtered.length;
